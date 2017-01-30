@@ -1,0 +1,28 @@
+How to handle:
+- Chunked encoding
+- Range requests
+
+Do we need these packages:
+- GZIP
+
+Interesting packages to explore:
+ - authentication
+ 
+ 
+ 
+Changes to the Jetty source:
+ 
+org.eclipse.jetty.server.Server
+  - commented out import for org.eclipse.jetty.server.handler.StatisticsHandler
+  
+
+  
+org.eclipse.jetty.util.log.Log
+  - Added hack for JavaXT:
+    props.setProperty("org.eclipse.jetty.util.log.class","javaxt.http.ServerLog");
+    
+    
+    
+Deleted:
+    org.eclipse.jetty.server.Slf4jRequestLog
+    org.eclipse.jetty.server.handler.HandlerList
