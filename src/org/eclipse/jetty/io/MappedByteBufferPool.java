@@ -19,55 +19,53 @@
 package org.eclipse.jetty.io;
 
 import java.nio.ByteBuffer;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import org.eclipse.jetty.util.BufferUtil;
 
 public class MappedByteBufferPool implements ByteBufferPool
 {
-    private final ConcurrentMap<Integer, Queue<ByteBuffer>> directBuffers = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Integer, Queue<ByteBuffer>> heapBuffers = new ConcurrentHashMap<>();
-    private final int factor;
+    private final ConcurrentMap<Integer, Bucket> directBuffers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, Bucket> heapBuffers = new ConcurrentHashMap<>();
+    private final int _factor;
+    private final int _maxQueue;
+    private final Function<Integer, Bucket> _newBucket;
 
     public MappedByteBufferPool()
     {
-        this(1024);
+        this(-1);
     }
 
     public MappedByteBufferPool(int factor)
     {
-        this.factor = factor;
+        this(factor,-1,null);
+    }
+    
+    public MappedByteBufferPool(int factor,int maxQueue)
+    {
+        this(factor,maxQueue,null);
+    }
+    
+    public MappedByteBufferPool(int factor,int maxQueue,Function<Integer, Bucket> newBucket)
+    {
+        _factor = factor<=0?1024:factor;
+        _maxQueue = maxQueue;
+        _newBucket = newBucket!=null?newBucket:i->new Bucket(this,i*_factor,_maxQueue);
     }
 
     @Override
     public ByteBuffer acquire(int size, boolean direct)
     {
-        int bucket = bucketFor(size);
-        ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = buffersFor(direct);
+        int b = bucketFor(size);
+        ConcurrentMap<Integer, Bucket> buffers = bucketsFor(direct);
 
-        ByteBuffer result = null;
-        Queue<ByteBuffer> byteBuffers = buffers.get(bucket);
-        if (byteBuffers != null)
-            result = byteBuffers.poll();
-
-        if (result == null)
-        {
-            int capacity = bucket * factor;
-            result = newByteBuffer(capacity, direct);
-        }
-
-        BufferUtil.clear(result);
-        return result;
-    }
-
-    protected ByteBuffer newByteBuffer(int capacity, boolean direct)
-    {
-        return direct ? BufferUtil.allocateDirect(capacity)
-                      : BufferUtil.allocate(capacity);
+        Bucket bucket = buffers.get(b);
+        if (bucket==null)
+            return newByteBuffer(b*_factor, direct);
+        return bucket.acquire(direct);
     }
 
     @Override
@@ -77,41 +75,33 @@ public class MappedByteBufferPool implements ByteBufferPool
             return; // nothing to do
         
         // validate that this buffer is from this pool
-        assert((buffer.capacity() % factor) == 0);
+        assert((buffer.capacity() % _factor) == 0);
         
-        int bucket = bucketFor(buffer.capacity());
-        ConcurrentMap<Integer, Queue<ByteBuffer>> buffers = buffersFor(buffer.isDirect());
+        int b = bucketFor(buffer.capacity());
+        ConcurrentMap<Integer, Bucket> buckets = bucketsFor(buffer.isDirect());
 
-        // Avoid to create a new queue every time, just to be discarded immediately
-        Queue<ByteBuffer> byteBuffers = buffers.get(bucket);
-        if (byteBuffers == null)
-        {
-            byteBuffers = new ConcurrentLinkedQueue<>();
-            Queue<ByteBuffer> existing = buffers.putIfAbsent(bucket, byteBuffers);
-            if (existing != null)
-                byteBuffers = existing;
-        }
-
-        BufferUtil.clear(buffer);
-        byteBuffers.offer(buffer);
+        Bucket bucket = buckets.computeIfAbsent(b,_newBucket);
+        bucket.release(buffer);
     }
 
     public void clear()
     {
+        directBuffers.values().forEach(Bucket::clear);
         directBuffers.clear();
+        heapBuffers.values().forEach(Bucket::clear);
         heapBuffers.clear();
     }
 
     private int bucketFor(int size)
     {
-        int bucket = size / factor;
-        if (size % factor > 0)
+        int bucket = size / _factor;
+        if (size % _factor > 0)
             ++bucket;
         return bucket;
     }
 
     // Package local for testing
-    ConcurrentMap<Integer, Queue<ByteBuffer>> buffersFor(boolean direct)
+    ConcurrentMap<Integer, Bucket> bucketsFor(boolean direct)
     {
         return direct ? directBuffers : heapBuffers;
     }
@@ -121,7 +111,7 @@ public class MappedByteBufferPool implements ByteBufferPool
         private final AtomicInteger tag = new AtomicInteger();
 
         @Override
-        protected ByteBuffer newByteBuffer(int capacity, boolean direct)
+        public ByteBuffer newByteBuffer(int capacity, boolean direct)
         {
             ByteBuffer buffer = super.newByteBuffer(capacity + 4, direct);
             buffer.limit(buffer.capacity());

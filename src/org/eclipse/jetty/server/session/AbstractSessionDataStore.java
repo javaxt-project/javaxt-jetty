@@ -23,13 +23,14 @@ package org.eclipse.jetty.server.session;
 import java.util.Set;
 
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
+import org.eclipse.jetty.util.component.ContainerLifeCycle;
 
 /**
  * AbstractSessionDataStore
  *
  *
  */
-public abstract class AbstractSessionDataStore extends AbstractLifeCycle implements SessionDataStore
+public abstract class AbstractSessionDataStore extends ContainerLifeCycle implements SessionDataStore
 {
     protected SessionContext _context; //context associated with this session data store
     protected int _gracePeriodSec = 60 * 60; //default of 1hr 
@@ -51,7 +52,7 @@ public abstract class AbstractSessionDataStore extends AbstractLifeCycle impleme
      * Implemented by subclasses to resolve which sessions this node
      * should attempt to expire.
      * 
-     * @param candidates the ids of sessions the SessionStore thinks has expired
+     * @param candidates the ids of sessions the SessionDataStore thinks has expired
      * @return the reconciled set of session ids that this node should attempt to expire
      */
     public abstract Set<String> doGetExpired (Set<String> candidates);
@@ -60,7 +61,7 @@ public abstract class AbstractSessionDataStore extends AbstractLifeCycle impleme
     /** 
      * @see org.eclipse.jetty.server.session.SessionDataStore#initialize(org.eclipse.jetty.server.session.SessionContext)
      */
-    public void initialize (SessionContext context)
+    public void initialize (SessionContext context) throws Exception
     {
         if (isStarted())
             throw new IllegalStateException("Context set after SessionDataStore started");
@@ -146,4 +147,16 @@ public abstract class AbstractSessionDataStore extends AbstractLifeCycle impleme
         _gracePeriodSec = sec;
     }
 
+
+    /** 
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString()
+    {
+       return String.format("%s@%x[passivating=%b,graceSec=%d]",this.getClass().getName(),this.hashCode(),isPassivating(),getGracePeriodSec());
+
+    }
+
+    
 }

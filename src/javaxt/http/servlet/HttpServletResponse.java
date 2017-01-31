@@ -796,6 +796,7 @@ public class HttpServletResponse {
             }
 
             public void onError(Throwable t) {
+                t.printStackTrace();
                 request.getServletContext().log("Async Error",t);
                 async.complete();
             }

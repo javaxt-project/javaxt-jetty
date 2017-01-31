@@ -19,10 +19,7 @@
 
 package org.eclipse.jetty.server.session;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -31,71 +28,62 @@ import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.statistic.CounterStatistic;
 
 /**
- * MemorySessionStore
+ * DefaultSessionCache
  *
  * A session store that keeps its sessions in memory in a hashmap
  */
-public class MemorySessionStore extends AbstractSessionStore
+public class DefaultSessionCache extends AbstractSessionCache
 {
     private  final static Logger LOG = Log.getLogger("org.eclipse.jetty.server.session");
     
     
+    /**
+     * The cache of sessions in a hashmap
+     */
     protected ConcurrentHashMap<String, Session> _sessions = new ConcurrentHashMap<String, Session>();
     
     private final CounterStatistic _stats = new CounterStatistic();
     
     
+    
     /**
-     * MemorySession
-     *
-     *
+     * @param manager
      */
-    public class MemorySession extends Session
-    {
-        /**
-         * @param request the request associated with the new session
-         * @param data the info for the session
-         */
-        public MemorySession(HttpServletRequest request, SessionData data)
-        {
-            super(request, data);
-        }
-        
-        
-        /**
-         * @param data the info for the restored session object
-         */
-        public MemorySession(SessionData data)
-        {
-            super(data);
-        }
-    }
-    
-    
-    
-    public MemorySessionStore (SessionManager manager)
+    public DefaultSessionCache (SessionHandler manager)
     {
         super (manager);
     }
     
     
-    public long getSessions ()
+    /**
+     * @return the number of sessions in the cache
+     */
+    public long getSessionsCurrent ()
     {
         return _stats.getCurrent();
     }
     
     
+    /**
+     * @return the max number of sessions in the cache
+     */
     public long getSessionsMax()
     {
         return _stats.getMax();
     }
     
     
+    /**
+     * @return a running total of sessions in the cache
+     */
     public long getSessionsTotal()
     {
         return _stats.getTotal();
     }
     
+    /**
+     * 
+     */
     public void resetStats()
     {
         _stats.reset();
@@ -103,7 +91,7 @@ public class MemorySessionStore extends AbstractSessionStore
     
     
     /** 
-     * @see org.eclipse.jetty.server.session.AbstractSessionStore#doGet(java.lang.String)
+     * @see org.eclipse.jetty.server.session.AbstractSessionCache#doGet(java.lang.String)
      */
     @Override
     public Session doGet(String id)
@@ -118,7 +106,7 @@ public class MemorySessionStore extends AbstractSessionStore
 
 
     /** 
-     * @see org.eclipse.jetty.server.session.AbstractSessionStore#doPutIfAbsent(java.lang.String, org.eclipse.jetty.server.session.Session)
+     * @see org.eclipse.jetty.server.session.AbstractSessionCache#doPutIfAbsent(java.lang.String, org.eclipse.jetty.server.session.Session)
      */
     @Override
     public Session doPutIfAbsent(String id, Session session)
@@ -132,7 +120,7 @@ public class MemorySessionStore extends AbstractSessionStore
   
 
     /** 
-     * @see org.eclipse.jetty.server.session.AbstractSessionStore#doDelete(java.lang.String)
+     * @see org.eclipse.jetty.server.session.AbstractSessionCache#doDelete(java.lang.String)
      */
     @Override
     public Session doDelete(String id)
@@ -193,12 +181,12 @@ public class MemorySessionStore extends AbstractSessionStore
 
  
     /** 
-     * @see org.eclipse.jetty.server.session.AbstractSessionStore#newSession(javax.servlet.http.HttpServletRequest, org.eclipse.jetty.server.session.SessionData)
+     * @see org.eclipse.jetty.server.session.AbstractSessionCache#newSession(javax.servlet.http.HttpServletRequest, org.eclipse.jetty.server.session.SessionData)
      */
     @Override
     public Session newSession(HttpServletRequest request, SessionData data)
     {
-        MemorySession s =  new MemorySession(request,data);
+        Session s =  new Session(getSessionHandler(),request, data);
         return s;
     }
 
@@ -206,12 +194,12 @@ public class MemorySessionStore extends AbstractSessionStore
 
 
     /** 
-     * @see org.eclipse.jetty.server.session.AbstractSessionStore#newSession(org.eclipse.jetty.server.session.SessionData)
+     * @see org.eclipse.jetty.server.session.AbstractSessionCache#newSession(org.eclipse.jetty.server.session.SessionData)
      */
     @Override
     public Session newSession(SessionData data)
     {
-        MemorySession s = new MemorySession (data);
+        Session s = new Session (getSessionHandler(), data);
         return s;
     }
 
@@ -219,7 +207,7 @@ public class MemorySessionStore extends AbstractSessionStore
 
 
     /** 
-     * @see org.eclipse.jetty.server.session.AbstractSessionStore#doReplace(java.lang.String, org.eclipse.jetty.server.session.Session, org.eclipse.jetty.server.session.Session)
+     * @see org.eclipse.jetty.server.session.AbstractSessionCache#doReplace(java.lang.String, org.eclipse.jetty.server.session.Session, org.eclipse.jetty.server.session.Session)
      */
     @Override
     public boolean doReplace(String id, Session oldValue, Session newValue)

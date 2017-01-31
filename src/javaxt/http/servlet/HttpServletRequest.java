@@ -49,7 +49,6 @@ public class HttpServletRequest {
                 str.append(query);
             }
             this.url = new java.net.URL(str.toString());
-            System.out.println(this.url);
         }
         catch(Exception e){
             e.printStackTrace();

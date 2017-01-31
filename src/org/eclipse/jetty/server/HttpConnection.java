@@ -124,9 +124,7 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
 
     protected HttpChannelOverHttp newHttpChannel()
     {
-        HttpChannelOverHttp httpChannel = new HttpChannelOverHttp(this, _connector, _config, getEndPoint(), this);
-
-        return httpChannel;
+        return new HttpChannelOverHttp(this, _connector, _config, getEndPoint(), this);
     }
 
     protected HttpParser newHttpParser(HttpCompliance compliance)
@@ -171,13 +169,13 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
     }
 
     @Override
-    public int getMessagesIn()
+    public long getMessagesIn()
     {
         return getHttpChannel().getRequests();
     }
 
     @Override
-    public int getMessagesOut()
+    public long getMessagesOut()
     {
         return getHttpChannel().getRequests();
     }
@@ -285,9 +283,8 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
         while (_parser.inContentState())
         {
             int filled = fillRequestBuffer();
-            boolean handle = parseRequestBuffer();
-            handled|=handle;
-            if (handle || filled<=0 || _channel.getRequest().getHttpInput().hasContent())
+            handled = parseRequestBuffer();
+            if (handled || filled<=0 || _channel.getRequest().getHttpInput().hasContent())
                 break;
         }
         return handled;
@@ -530,6 +527,8 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
     @Override
     public void abort(Throwable failure)
     {
+        if (LOG.isDebugEnabled())
+            LOG.debug("abort {} {}",this,failure);
         // Do a direct close of the output, as this may indicate to a client that the
         // response is bad either with RST or by abnormal completion of chunked response.
         getEndPoint().close();
@@ -563,10 +562,11 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
     }
 
     @Override
-    public String toString()
+    public String toConnectionString()
     {
-        return String.format("%s[p=%s,g=%s,c=%s]",
-                super.toString(),
+        return String.format("%s@%x[p=%s,g=%s]=>%s",
+                getClass().getSimpleName(),
+                hashCode(),
                 _parser,
                 _generator,
                 _channel);
@@ -609,11 +609,11 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
         }
 
         @Override
-        public boolean isNonBlocking()
+        public InvocationType getInvocationType()
         {
             // This callback does not block, rather it wakes up the
             // thread that is blocked waiting on the read.
-            return true;
+            return InvocationType.NON_BLOCKING;
         }
     }
 
@@ -652,9 +652,9 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
         }
 
         @Override
-        public boolean isNonBlocking()
+        public InvocationType getInvocationType()
         {
-            return _callback.isNonBlocking();
+            return _callback.getInvocationType();
         }
 
         private boolean reset(MetaData.Response info, boolean head, ByteBuffer content, boolean last, Callback callback)

@@ -169,13 +169,12 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         __serverInfo = serverInfo;
     }
 
-
-
     protected Context _scontext;
     private final AttributesMap _attributes;
     private final Map<String, String> _initParams;
     private ClassLoader _classLoader;
     private String _contextPath = "/";
+    private String _contextPathEncoded = "/";
 
     private String _displayName;
 
@@ -212,33 +211,39 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     /* ------------------------------------------------------------ */
     public ContextHandler()
     {
-        this((Context)null);
+        this(null,null,null);
     }
 
     /* ------------------------------------------------------------ */
     protected ContextHandler(Context context)
     {
-        super();
+        this(context,null,null);
+    }
+
+    /* ------------------------------------------------------------ */
+    public ContextHandler(String contextPath)
+    {
+        this(null,null,contextPath);
+    }
+
+    /* ------------------------------------------------------------ */
+    public ContextHandler(HandlerContainer parent, String contextPath)
+    {
+        this(null,parent,contextPath);
+    }
+
+    /* ------------------------------------------------------------ */
+    private ContextHandler(Context context, HandlerContainer parent, String contextPath)
+    {
         _scontext = context==null?new Context():context;
         _attributes = new AttributesMap();
         _initParams = new HashMap<String, String>();
         addAliasCheck(new ApproveNonExistentDirectoryAliases());
         if (File.separatorChar=='/')
             addAliasCheck(new AllowSymLinkAliasChecker());
-    }
 
-    /* ------------------------------------------------------------ */
-    public ContextHandler(String contextPath)
-    {
-        this();
-        setContextPath(contextPath);
-    }
-
-    /* ------------------------------------------------------------ */
-    public ContextHandler(HandlerContainer parent, String contextPath)
-    {
-        this();
-        setContextPath(contextPath);
+        if (contextPath!=null)
+            setContextPath(contextPath);
         if (parent instanceof HandlerWrapper)
             ((HandlerWrapper)parent).setHandler(this);
         else if (parent instanceof HandlerCollection)
@@ -501,12 +506,21 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
 
     /* ------------------------------------------------------------ */
     /**
-     * @return Returns the _contextPath.
+     * @return Returns the contextPath.
      */
     @ManagedAttribute("True if URLs are compacted to replace the multiple '/'s with a single '/'")
     public String getContextPath()
     {
         return _contextPath;
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * @return Returns the encoded contextPath.
+     */
+    public String getContextPathEncoded()
+    {
+        return _contextPathEncoded;
     }
 
     /* ------------------------------------------------------------ */
@@ -1102,7 +1116,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
                 if (_contextPath.length() == 1)
                     baseRequest.setContextPath("");
                 else
-                    baseRequest.setContextPath(_contextPath);
+                    baseRequest.setContextPath(_contextPathEncoded);
                 baseRequest.setServletPath(null);
                 baseRequest.setPathInfo(pathInfo);
             }
@@ -1113,16 +1127,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             if (LOG.isDebugEnabled())
                 LOG.debug("context={}|{}|{} @ {}",baseRequest.getContextPath(),baseRequest.getServletPath(), baseRequest.getPathInfo(),this);
 
-            // start manual inline of nextScope(target,baseRequest,request,response);
-            if (never())
-                nextScope(target,baseRequest,request,response);
-            else if (_nextScope != null)
-                _nextScope.doScope(target,baseRequest,request,response);
-            else if (_outerScope != null)
-                _outerScope.doHandle(target,baseRequest,request,response);
-            else
-                doHandle(target,baseRequest,request,response);
-            // end manual inline (pathentic attempt to reduce stack depth)
+            nextScope(target,baseRequest,request,response);
         }
         finally
         {
@@ -1145,7 +1150,41 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             }
         }
     }
+    
+    /* ------------------------------------------------------------ */
+    protected void requestInitialized(Request baseRequest, HttpServletRequest request)
+    {
+        // Handle the REALLY SILLY request events!
+        if (!_servletRequestAttributeListeners.isEmpty())
+            for (ServletRequestAttributeListener l :_servletRequestAttributeListeners)
+                baseRequest.addEventListener(l);
 
+        if (!_servletRequestListeners.isEmpty())
+        {
+            final ServletRequestEvent sre = new ServletRequestEvent(_scontext,request);
+            for (ServletRequestListener l : _servletRequestListeners)
+                l.requestInitialized(sre);
+        }
+    }
+
+    /* ------------------------------------------------------------ */
+    protected void requestDestroyed(Request baseRequest, HttpServletRequest request)
+    {
+        // Handle more REALLY SILLY request events!
+        if (!_servletRequestListeners.isEmpty())
+        {
+            final ServletRequestEvent sre = new ServletRequestEvent(_scontext,request);
+            for (int i=_servletRequestListeners.size();i-->0;)
+                _servletRequestListeners.get(i).requestDestroyed(sre);
+        }
+
+        if (!_servletRequestAttributeListeners.isEmpty())
+        {
+            for (int i=_servletRequestAttributeListeners.size();i-->0;)
+                baseRequest.removeEventListener(_servletRequestAttributeListeners.get(i));
+        }
+    }
+    
     /* ------------------------------------------------------------ */
     /**
      * @see org.eclipse.jetty.server.handler.ScopedHandler#doHandle(java.lang.String, org.eclipse.jetty.server.Request, javax.servlet.http.HttpServletRequest,
@@ -1159,19 +1198,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         try
         {
             if (new_context)
-            {
-                // Handle the REALLY SILLY request events!
-                if (!_servletRequestAttributeListeners.isEmpty())
-                    for (ServletRequestAttributeListener l :_servletRequestAttributeListeners)
-                        baseRequest.addEventListener(l);
-
-                if (!_servletRequestListeners.isEmpty())
-                {
-                    final ServletRequestEvent sre = new ServletRequestEvent(_scontext,request);
-                    for (ServletRequestListener l : _servletRequestListeners)
-                        l.requestInitialized(sre);
-                }
-            }
+                requestInitialized(baseRequest,request);
 
             switch(dispatch)
             {
@@ -1189,49 +1216,23 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
                     if (Boolean.TRUE.equals(baseRequest.getAttribute(Dispatcher.__ERROR_DISPATCH)))
                         break;
                     
-                    Object error = request.getAttribute(Dispatcher.ERROR_STATUS_CODE);
-                    // We can just call sendError here.  If there is no error page, then one will
+                    // We can just call doError here.  If there is no error page, then one will
                     // be generated. If there is an error page, then a RequestDispatcher will be
                     // used to route the request through appropriate filters etc.
-                    response.sendError((error instanceof Integer)?((Integer)error).intValue():500);
+                    doError(target,baseRequest,request,response);
                     return;
                 default:
                     break;
             }
 
-            // start manual inline of nextHandle(target,baseRequest,request,response);
-            // noinspection ConstantIfStatement
-            if (never())
-                nextHandle(target,baseRequest,request,response);
-            else if (_nextScope != null && _nextScope == _handler)
-                _nextScope.doHandle(target,baseRequest,request,response);
-            else if (_handler != null)
-                _handler.handle(target,baseRequest,request,response);
-            // end manual inline
+            nextHandle(target,baseRequest,request,response);
         }
         finally
         {
-            // Handle more REALLY SILLY request events!
             if (new_context)
-            {
-                if (!_servletRequestListeners.isEmpty())
-                {
-                    final ServletRequestEvent sre = new ServletRequestEvent(_scontext,request);
-                    for (int i=_servletRequestListeners.size();i-->0;)
-                        _servletRequestListeners.get(i).requestDestroyed(sre);
-                }
-
-                if (!_servletRequestAttributeListeners.isEmpty())
-                {
-                    for (int i=_servletRequestAttributeListeners.size();i-->0;)
-                        baseRequest.removeEventListener(_servletRequestAttributeListeners.get(i));
-                }
-            }
+                requestDestroyed(baseRequest,request);
         }
     }
-
-
-
 
     /**
      * @param request A request that is applicable to the scope, or null
@@ -1479,6 +1480,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         }
 
         _contextPath = contextPath;
+        _contextPathEncoded = URIUtil.encodePath(contextPath);
 
         if (getServer() != null && (getServer().isStarting() || getServer().isStarted()))
         {
@@ -2068,6 +2070,8 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         @Override
         public RequestDispatcher getRequestDispatcher(String uriInContext)
         {
+            // uriInContext is encoded, potentially with query
+
             if (uriInContext == null)
                 return null;
 
@@ -2150,6 +2154,9 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
                 if (url == null)
                     return null;
                 Resource r = Resource.newResource(url);
+                // Cannot serve directories as an InputStream
+                if(r.isDirectory())
+                    return null;
                 return r.getInputStream();
             }
             catch (Exception e)

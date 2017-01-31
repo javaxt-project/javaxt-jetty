@@ -29,6 +29,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -369,23 +370,42 @@ public class Server extends HandlerWrapper implements Attributes
         ShutdownMonitor.getInstance().start(); // initialize
 
         LOG.info("jetty-" + getVersion());
+        if (!Jetty.STABLE)
+        {
+            LOG.warn("THIS IS NOT A STABLE RELEASE! DO NOT USE IN PRODUCTION!");
+            LOG.warn("Download a stable release from http://download.eclipse.org/jetty/");
+        }
+        
         HttpGenerator.setJettyVersion(HttpConfiguration.SERVER_VERSION);
-        MultiException mex=new MultiException();
 
-        // check size of thread pool
+        // Check that the thread pool size is enough.
         SizedThreadPool pool = getBean(SizedThreadPool.class);
         int max=pool==null?-1:pool.getMaxThreads();
         int selectors=0;
         int acceptors=0;
-        if (mex.size()==0)
+
+        for (Connector connector : _connectors)
         {
-            for (Connector connector : _connectors)
+            if (connector instanceof AbstractConnector)
             {
-                if (connector instanceof AbstractConnector)
-                    acceptors+=((AbstractConnector)connector).getAcceptors();
+                AbstractConnector abstractConnector = (AbstractConnector)connector;
+                Executor connectorExecutor = connector.getExecutor();
+
+                if (connectorExecutor != pool)
+                {
+                    // Do not count the selectors and acceptors from this connector at
+                    // the server level, because the connector uses a dedicated executor.
+                    continue;
+                }
+
+                acceptors += abstractConnector.getAcceptors();
 
                 if (connector instanceof ServerConnector)
-                    selectors+=((ServerConnector)connector).getSelectorManager().getSelectorCount();
+                {
+                    // The SelectorManager uses 2 threads for each selector,
+                    // one for the normal and one for the low priority strategies.
+                    selectors += 2 * ((ServerConnector)connector).getSelectorManager().getSelectorCount();
+                }
             }
         }
 
@@ -393,6 +413,7 @@ public class Server extends HandlerWrapper implements Attributes
         if (max>0 && needed>max)
             throw new IllegalStateException(String.format("Insufficient threads: max=%d < needed(acceptors=%d + selectors=%d + request=1)",max,acceptors,selectors));
 
+        MultiException mex=new MultiException();
         try
         {
             super.doStart();
@@ -522,15 +543,14 @@ public class Server extends HandlerWrapper implements Attributes
      * or after the entire request has been received (for short requests of known length), or
      * on the dispatch of an async request.
      */
-    public void handle(HttpChannel connection) throws IOException, ServletException
+    public void handle(HttpChannel channel) throws IOException, ServletException
     {
-        final String target=connection.getRequest().getPathInfo();
-        final Request request=connection.getRequest();
-        final Response response=connection.getResponse();
+        final String target=channel.getRequest().getPathInfo();
+        final Request request=channel.getRequest();
+        final Response response=channel.getResponse();
 
         if (LOG.isDebugEnabled())
-            LOG.debug("{} on {}{}{} {} {}{}{}", request.getDispatcherType(), connection, System.lineSeparator(),
-                    request.getMethod(), target, request.getProtocol(), System.lineSeparator(), request.getHttpFields());
+            LOG.debug("{} {} {} on {}", request.getDispatcherType(), request.getMethod(), target, channel);
 
         if (HttpMethod.OPTIONS.is(request.getMethod()) || "*".equals(target))
         {
@@ -544,8 +564,7 @@ public class Server extends HandlerWrapper implements Attributes
             handle(target, request, request, response);
 
         if (LOG.isDebugEnabled())
-            LOG.debug("RESPONSE for {} h={}{}{} {}{}{}", target, request.isHandled(), System.lineSeparator(),
-                    response.getStatus(), response.getReason(), System.lineSeparator(), response.getHttpFields());
+            LOG.debug("handled={} async={} committed={} on {}", request.isHandled(),request.isAsyncStarted(),response.isCommitted(),channel);
     }
 
     /* ------------------------------------------------------------ */
@@ -561,12 +580,12 @@ public class Server extends HandlerWrapper implements Attributes
      * or after the entire request has been received (for short requests of known length), or
      * on the dispatch of an async request.
      */
-    public void handleAsync(HttpChannel connection) throws IOException, ServletException
+    public void handleAsync(HttpChannel channel) throws IOException, ServletException
     {
-        final HttpChannelState state = connection.getRequest().getHttpChannelState();
+        final HttpChannelState state = channel.getRequest().getHttpChannelState();
         final AsyncContextEvent event = state.getAsyncContextEvent();
 
-        final Request baseRequest=connection.getRequest();
+        final Request baseRequest=channel.getRequest();
         final String path=event.getPath();
 
         if (path!=null)
@@ -574,7 +593,7 @@ public class Server extends HandlerWrapper implements Attributes
             // this is a dispatch with a path
             ServletContext context=event.getServletContext();
             String query=baseRequest.getQueryString();
-            baseRequest.setURIPathQuery(URIUtil.addPaths(context==null?null:context.getContextPath(), path));
+            baseRequest.setURIPathQuery(URIUtil.addPaths(context==null?null:URIUtil.encodePath(context.getContextPath()), path));
             HttpURI uri = baseRequest.getHttpURI();
             baseRequest.setPathInfo(uri.getDecodedPath());
             if (uri.getQuery()!=null)
@@ -586,14 +605,10 @@ public class Server extends HandlerWrapper implements Attributes
         final HttpServletResponse response=(HttpServletResponse)event.getSuppliedResponse();
 
         if (LOG.isDebugEnabled())
-        {
-            LOG.debug(request.getDispatcherType()+" "+request.getMethod()+" "+target+" on "+connection);
-            handle(target, baseRequest, request, response);
-            LOG.debug("RESPONSE "+target+"  "+connection.getResponse().getStatus());
-        }
-        else
-            handle(target, baseRequest, request, response);
-
+            LOG.debug("{} {} {} on {}", request.getDispatcherType(), request.getMethod(), target, channel);
+        handle(target, baseRequest, request, response);
+        if (LOG.isDebugEnabled())
+            LOG.debug("handledAsync={} async={} committed={} on {}", channel.getRequest().isHandled(),request.isAsyncStarted(),response.isCommitted(),channel);
     }
 
     /* ------------------------------------------------------------ */
@@ -674,7 +689,8 @@ public class Server extends HandlerWrapper implements Attributes
     @Override
     public void setAttribute(String name, Object attribute)
     {
-        addBean(attribute);
+        Object old=_attributes.getAttribute(name);
+        updateBean(old,attribute);        
         _attributes.setAttribute(name, attribute);
     }
 

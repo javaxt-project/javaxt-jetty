@@ -18,6 +18,7 @@
 
 package org.eclipse.jetty.io;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
@@ -28,7 +29,7 @@ import java.nio.channels.SelectionKey;
 import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
-import org.eclipse.jetty.util.thread.ExecutionStrategy.Rejectable;
+import org.eclipse.jetty.util.thread.Invocable;
 import org.eclipse.jetty.util.thread.Locker;
 import org.eclipse.jetty.util.thread.Scheduler;
 
@@ -45,7 +46,6 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
     private final GatheringByteChannel _gather;
     protected final ManagedSelector _selector;
     protected final SelectionKey _key;
-
     private boolean _updatePending;
 
     /**
@@ -58,11 +58,11 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
      */
     protected int _desiredInterestOps;
 
-
-    private abstract class RunnableTask  implements Runnable
+    private abstract class RunnableTask  implements Runnable, Invocable
     {
         final String _operation;
-        RunnableTask(String op)
+
+        protected RunnableTask(String op)
         {
             _operation=op;
         }
@@ -70,23 +70,23 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
         @Override
         public String toString()
         {
-            return ChannelEndPoint.this.toString()+":"+_operation;
+            return String.format("CEP:%s:%s:%s",ChannelEndPoint.this,_operation,getInvocationType());
         }
     }
 
-    private abstract class RejectableRunnable extends RunnableTask implements Rejectable
+    private abstract class RunnableCloseable extends RunnableTask implements Closeable
     {
-        RejectableRunnable(String op)
+        protected RunnableCloseable(String op)
         {
             super(op);
         }
 
         @Override
-        public void reject()
+        public void close()
         {
             try
             {
-                close();
+                ChannelEndPoint.this.close();
             }
             catch (Throwable x)
             {
@@ -98,14 +98,26 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
     private final Runnable _runUpdateKey = new RunnableTask("runUpdateKey")
     {
         @Override
+        public InvocationType getInvocationType()
+        {
+            return InvocationType.NON_BLOCKING;
+        }
+
+        @Override
         public void run()
         {
             updateKey();
         }
     };
 
-    private final Runnable _runFillable = new RejectableRunnable("runFillable")
+    private final Runnable _runFillable = new RunnableCloseable("runFillable")
     {
+        @Override
+        public InvocationType getInvocationType()
+        {
+            return getFillInterest().getCallbackInvocationType();
+        }
+        
         @Override
         public void run()
         {
@@ -113,17 +125,47 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
         }
     };
 
-    private final Runnable _runCompleteWrite = new RejectableRunnable("runCompleteWrite")
+    private final Runnable _runCompleteWrite = new RunnableCloseable("runCompleteWrite")
     {
+        @Override
+        public InvocationType getInvocationType()
+        {
+            return getWriteFlusher().getCallbackInvocationType();
+        }
+        
         @Override
         public void run()
         {
             getWriteFlusher().completeWrite();
         }
+
+        @Override
+        public String toString()
+        {
+            return String.format("CEP:%s:%s:%s->%s",ChannelEndPoint.this,_operation,getInvocationType(),getWriteFlusher());
+        }
+        
     };
 
-    private final Runnable _runFillableCompleteWrite = new RejectableRunnable("runFillableCompleteWrite")
+    private final Runnable _runCompleteWriteFillable = new RunnableCloseable("runCompleteWriteFillable")
     {
+        @Override
+        public InvocationType getInvocationType()
+        {
+            InvocationType fillT = getFillInterest().getCallbackInvocationType();
+            InvocationType flushT = getWriteFlusher().getCallbackInvocationType();
+            if (fillT==flushT)
+                return fillT;
+            
+            if (fillT==InvocationType.EITHER && flushT==InvocationType.NON_BLOCKING)
+                return InvocationType.EITHER;
+            
+            if (fillT==InvocationType.NON_BLOCKING && flushT==InvocationType.EITHER)
+                return InvocationType.EITHER;
+            
+            return InvocationType.BLOCKING;
+        }
+        
         @Override
         public void run()
         {
@@ -182,10 +224,9 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
         finally
         {
             if (_selector!=null)
-                _selector.onClose(this);
+                _selector.destroyEndPoint(this);
         }
     }
-
 
     @Override
     public int fill(ByteBuffer buffer) throws IOException
@@ -304,37 +345,20 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
             _desiredInterestOps = newInterestOps;
         }
 
-
-        boolean readable = (readyOps & SelectionKey.OP_READ) != 0;
-        boolean writable = (readyOps & SelectionKey.OP_WRITE) != 0;
-
+        boolean fillable = (readyOps & SelectionKey.OP_READ) != 0;
+        boolean flushable = (readyOps & SelectionKey.OP_WRITE) != 0;
 
         if (LOG.isDebugEnabled())
-            LOG.debug("onSelected {}->{} r={} w={} for {}", oldInterestOps, newInterestOps, readable, writable, this);
-
-        // Run non-blocking code immediately.
-        // This producer knows that this non-blocking code is special
-        // and that it must be run in this thread and not fed to the
-        // ExecutionStrategy, which could not have any thread to run these
-        // tasks (or it may starve forever just after having run them).
-        if (readable && getFillInterest().isCallbackNonBlocking())
-        {
-            if (LOG.isDebugEnabled())
-                LOG.debug("Direct readable run {}",this);
-            _runFillable.run();
-            readable = false;
-        }
-        if (writable && getWriteFlusher().isCallbackNonBlocking())
-        {
-            if (LOG.isDebugEnabled())
-                LOG.debug("Direct writable run {}",this);
-            _runCompleteWrite.run();
-            writable = false;
-        }
+            LOG.debug("onSelected {}->{} r={} w={} for {}", oldInterestOps, newInterestOps, fillable, flushable, this);
 
         // return task to complete the job
-        Runnable task= readable ? (writable ? _runFillableCompleteWrite : _runFillable)
-                : (writable ? _runCompleteWrite : null);
+        Runnable task= fillable 
+                ? (flushable 
+                        ? _runCompleteWriteFillable 
+                        : _runFillable)
+                : (flushable 
+                        ? _runCompleteWrite 
+                        : null);
 
         if (LOG.isDebugEnabled())
             LOG.debug("task {}",task);
@@ -407,7 +431,7 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
 
 
     @Override
-    public String toString()
+    public String toEndPointString()
     {
         // We do a best effort to print the right toString() and that's it.
         try
@@ -416,7 +440,7 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
             int keyInterests = valid ? _key.interestOps() : -1;
             int keyReadiness = valid ? _key.readyOps() : -1;
             return String.format("%s{io=%d/%d,kio=%d,kro=%d}",
-                    super.toString(),
+                    super.toEndPointString(),
                     _currentInterestOps,
                     _desiredInterestOps,
                     keyInterests,
@@ -427,5 +451,4 @@ public abstract class ChannelEndPoint extends AbstractEndPoint implements Manage
             return String.format("%s{io=%s,kio=-2,kro=-2}", super.toString(), _desiredInterestOps);
         }
     }
-
 }

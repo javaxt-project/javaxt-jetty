@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -43,9 +44,12 @@ import org.eclipse.jetty.util.component.Dumpable;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.thread.ExecutionStrategy;
-import org.eclipse.jetty.util.thread.ExecutionStrategy.Rejectable;
+import org.eclipse.jetty.util.thread.Invocable;
+import org.eclipse.jetty.util.thread.Invocable.InvocationType;
 import org.eclipse.jetty.util.thread.Locker;
 import org.eclipse.jetty.util.thread.Scheduler;
+import org.eclipse.jetty.util.thread.strategy.ExecuteProduceConsume;
+import org.eclipse.jetty.util.thread.strategy.ProduceExecuteConsume;
 
 /**
  * <p>{@link ManagedSelector} wraps a {@link Selector} simplifying non-blocking operations on channels.</p>
@@ -53,7 +57,7 @@ import org.eclipse.jetty.util.thread.Scheduler;
  * happen for registered channels. When events happen, it notifies the {@link EndPoint} associated
  * with the channel.</p>
  */
-public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dumpable
+public class ManagedSelector extends AbstractLifeCycle implements Dumpable
 {
     private static final Logger LOG = Log.getLogger(ManagedSelector.class);
 
@@ -63,13 +67,17 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
     private final SelectorManager _selectorManager;
     private final int _id;
     private final ExecutionStrategy _strategy;
+    private final ExecutionStrategy _lowPriorityStrategy;
     private Selector _selector;
 
     public ManagedSelector(SelectorManager selectorManager, int id)
     {
         _selectorManager = selectorManager;
         _id = id;
-        _strategy = ExecutionStrategy.Factory.instanceFor(new SelectorProducer(), selectorManager.getExecutor());
+        SelectorProducer producer = new SelectorProducer();
+        Executor executor = selectorManager.getExecutor();
+        _strategy = new ExecuteProduceConsume(producer, executor, Invocable.InvocationType.BLOCKING);
+        _lowPriorityStrategy = new LowPriorityProduceExecuteConsume(producer, executor);
         setStopTimeout(5000);
     }
 
@@ -77,7 +85,38 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
     protected void doStart() throws Exception
     {
         super.doStart();
+
         _selector = _selectorManager.newSelector();
+
+        // The producer used by the strategies will never
+        // be idle (either produces a task or blocks).
+
+        // The normal strategy obtains the produced task, schedules
+        // a new thread to produce more, runs the task and then exits.
+        _selectorManager.execute(_strategy::produce);
+
+        // The low priority strategy knows the producer will never
+        // be idle, that tasks are scheduled to run in different
+        // threads, therefore lowPriorityProduce() never exits.
+        _selectorManager.execute(this::lowPriorityProduce);
+    }
+
+    private void lowPriorityProduce()
+    {
+        Thread current = Thread.currentThread();
+        String name = current.getName();
+        int priority = current.getPriority();
+        current.setPriority(Thread.MIN_PRIORITY);
+        current.setName(name+"-lowPrioritySelector");
+        try
+        {
+            _lowPriorityStrategy.produce();
+        }
+        finally
+        {
+            current.setPriority(priority);
+            current.setName(name);
+        }
     }
 
     public int size()
@@ -125,17 +164,11 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
             selector.wakeup();
     }
 
-    @Override
-    public void run()
-    {
-        _strategy.execute();
-    }
-
     /**
      * A {@link Selectable} is an {@link EndPoint} that wish to be
      * notified of non-blocking events by the {@link ManagedSelector}.
      */
-    public interface Selectable 
+    public interface Selectable
     {
         /**
          * Callback method invoked when a read or write events has been
@@ -152,6 +185,43 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         void updateKey();
     }
 
+    private static class LowPriorityProduceExecuteConsume extends ProduceExecuteConsume
+    {
+        private LowPriorityProduceExecuteConsume(SelectorProducer producer, Executor executor)
+        {
+            super(producer, executor, InvocationType.BLOCKING);
+        }
+
+        @Override
+        protected boolean execute(Runnable task)
+        {
+            try
+            {
+                InvocationType invocation=Invocable.getInvocationType(task);
+                if (LOG.isDebugEnabled())
+                    LOG.debug("Low Priority Selector executing {} {}",invocation,task);
+                switch (invocation)
+                {
+                    case NON_BLOCKING:
+                        task.run();
+                        return true;
+
+                    case EITHER:
+                        Invocable.invokeNonBlocking(task);
+                        return true;
+
+                    default:
+                        return super.execute(task);
+                }
+            }
+            finally
+            {
+                // Allow opportunity for main strategy to take over.
+                Thread.yield();
+            }
+        }
+    }
+
     private class SelectorProducer implements ExecutionStrategy.Producer
     {
         private Set<SelectionKey> _keys = Collections.emptySet();
@@ -160,24 +230,34 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         @Override
         public Runnable produce()
         {
-            while (true)
+            // This method is called from both the
+            // normal and low priority strategies.
+            // Only one can produce at a time, so it's synchronized
+            // to enforce that only one strategy actually produces.
+            // When idle in select(), this method blocks;
+            // the other strategy's thread will be blocked
+            // waiting for this lock to be released.
+            synchronized (this)
             {
-                Runnable task = processSelected();
-                if (task != null)
-                    return task;
+                while (true)
+                {
+                    Runnable task = processSelected();
+                    if (task != null)
+                        return task;
 
-                Runnable action = runActions();
-                if (action != null)
-                    return action;
+                    Runnable action = nextAction();
+                    if (action != null)
+                        return action;
 
-                update();
+                    update();
 
-                if (!select())
-                    return null;
+                    if (!select())
+                        return null;
+                }
             }
         }
 
-        private Runnable runActions()
+        private Runnable nextAction()
         {
             while (true)
             {
@@ -193,25 +273,20 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
                     }
                 }
 
-                if (action instanceof Product)
+                if (Invocable.getInvocationType(action)==InvocationType.BLOCKING)
                     return action;
 
-                // Running the change may queue another action.
-                runChange(action);
-            }
-        }
-
-        private void runChange(Runnable change)
-        {
-            try
-            {
-                if (LOG.isDebugEnabled())
-                    LOG.debug("Running change {}", change);
-                change.run();
-            }
-            catch (Throwable x)
-            {
-                LOG.debug("Could not run change " + change, x);
+                try
+                {
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("Running action {}", action);
+                    // Running the change may queue another action.
+                    action.run();
+                }
+                catch (Throwable x)
+                {
+                    LOG.debug("Could not run action " + action, x);
+                }
             }
         }
 
@@ -324,14 +399,19 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
                 ((Selectable)attachment).updateKey();
         }
     }
-
-    private interface Product extends Runnable
+    
+    private abstract static class NonBlockingAction implements Runnable, Invocable
     {
+        @Override
+        public final InvocationType getInvocationType()
+        {
+            return InvocationType.NON_BLOCKING;
+        }
     }
 
     private Runnable processConnect(SelectionKey key, final Connect connect)
     {
-        SelectableChannel channel = (SelectableChannel)key.channel();
+        SelectableChannel channel = key.channel();
         try
         {
             key.attach(connect.attachment);
@@ -403,6 +483,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
     private EndPoint createEndPoint(SelectableChannel channel, SelectionKey selectionKey) throws IOException
     {
         EndPoint endPoint = _selectorManager.newEndPoint(channel, this, selectionKey);
+        endPoint.onOpen();
         _selectorManager.endPointOpened(endPoint);
         Connection connection = _selectorManager.newConnection(channel, endPoint, selectionKey.attachment());
         endPoint.setConnection(connection);
@@ -413,20 +494,16 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         return endPoint;
     }
 
-    public void onClose(final EndPoint endPoint)
+    public void destroyEndPoint(final EndPoint endPoint)
     {
         final Connection connection = endPoint.getConnection();
-        submit(new Product()
+        submit(() ->
         {
-            @Override
-            public void run()
-            {
-                if (LOG.isDebugEnabled())
-                    LOG.debug("Destroyed {}", endPoint);
-                if (connection != null)
-                    _selectorManager.connectionClosed(connection);
-                _selectorManager.endPointClosed(endPoint);
-            }
+            if (LOG.isDebugEnabled())
+                LOG.debug("Destroyed {}", endPoint);
+            if (connection != null)
+                _selectorManager.connectionClosed(connection);
+            _selectorManager.endPointClosed(endPoint);
         });
     }
 
@@ -511,7 +588,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    class Acceptor implements Runnable
+    class Acceptor extends NonBlockingAction
     {
         private final SelectableChannel _channel;
 
@@ -537,7 +614,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    class Accept implements Runnable, Rejectable
+    class Accept extends NonBlockingAction implements Closeable
     {
         private final SelectableChannel channel;
         private final Object attachment;
@@ -549,12 +626,12 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
 
         @Override
-        public void reject()
+        public void close()
         {
-            LOG.debug("rejected accept {}",channel);
+            LOG.debug("closed accept of {}", channel);
             closeNoExceptions(channel);
         }
-        
+
         @Override
         public void run()
         {
@@ -571,7 +648,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    private class CreateEndPoint implements Product, Rejectable
+    private class CreateEndPoint implements Runnable, Closeable
     {
         private final SelectableChannel channel;
         private final SelectionKey key;
@@ -597,9 +674,9 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
 
         @Override
-        public void reject()
+        public void close()
         {
-            LOG.debug("rejected create {}",channel);
+            LOG.debug("closed creation of {}", channel);
             closeNoExceptions(channel);
         }
 
@@ -610,7 +687,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    class Connect implements Runnable
+    class Connect extends NonBlockingAction
     {
         private final AtomicBoolean failed = new AtomicBoolean();
         private final SelectableChannel channel;
@@ -648,7 +725,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    private class ConnectTimeout implements Runnable
+    private class ConnectTimeout extends NonBlockingAction
     {
         private final Connect connect;
 
@@ -670,7 +747,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    private class CloseEndPoints implements Runnable
+    private class CloseEndPoints extends NonBlockingAction
     {
         private final CountDownLatch _latch = new CountDownLatch(1);
         private CountDownLatch _allClosed;
@@ -717,7 +794,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    private class EndPointCloser implements Product
+    private class EndPointCloser implements Runnable
     {
         private final EndPoint _endPoint;
         private final CountDownLatch _latch;
@@ -736,7 +813,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    private class CloseSelector implements Runnable
+    private class CloseSelector extends NonBlockingAction
     {
         private CountDownLatch _latch = new CountDownLatch(1);
 
@@ -760,5 +837,10 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
                 return false;
             }
         }
+    }
+
+    public Selector getSelector()
+    {
+        return _selector;        
     }
 }

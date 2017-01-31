@@ -50,16 +50,11 @@ import org.eclipse.jetty.util.annotation.ManagedObject;
 
 
 
-
-
-
-
-
 //******************************************************************************
 //**  JavaXT Http Server
 //******************************************************************************
 /**
- *   A lightweight, multi-threaded web server based on Jetty 9.3
+ *   A lightweight, multi-threaded web server based on Jetty 9.4
  *
  ******************************************************************************/
 
@@ -71,7 +66,7 @@ public class Server extends Thread {
             new java.util.ArrayList<InetSocketAddress>();
 
     private HttpServlet servlet;
-    
+       
     
   //**************************************************************************
   //** Constructor
@@ -488,6 +483,7 @@ public class Server extends Thread {
             @Override public void              setConnection              (final Connection    v) { endPoint.setConnection(v); }
             @Override public void              upgrade                    (final Connection    v) { endPoint.upgrade(v); }
             @Override public void              fillInterested  (final Callback   v) throws ReadPendingException { endPoint.fillInterested(v); }
+            @Override public boolean           tryFillInterested(final Callback v) { return endPoint.tryFillInterested(v); }
             @Override public int               hashCode() { return endPoint.hashCode(); }
             @Override public boolean           equals(final Object obj) { return endPoint.equals(obj); }
             @Override public String            toString() { return endPoint.toString(); }
@@ -555,7 +551,7 @@ public class Server extends Thread {
  *   update the source and add the following line in the run() method in the
  *   AccessController.doPrivileged() routine:
  *   
- *   __props.setProperty("org.eclipse.jetty.util.log.class","javaxt.http.ServerLog");
+ *   __props.setProperty("org.eclipse.jetty.util.log.class","javaxt.http.Server.Log");
  * 
  *   Be sure to put is right before __logClass is set.
  *

@@ -94,7 +94,7 @@ public class AsyncContextEvent extends AsyncEvent implements Runnable
     }
 
     /**
-     * @return The path in the context
+     * @return The path in the context (encoded with possible query string)
      */
     public String getPath()
     {
@@ -126,16 +126,14 @@ public class AsyncContextEvent extends AsyncEvent implements Runnable
         return _throwable;
     }
 
-//    public void setThrowable(Throwable throwable)
-//    {
-//        _throwable=throwable;
-//    }
-
     public void setDispatchContext(ServletContext context)
     {
         _dispatchContext=context;
     }
 
+    /**
+     * @param path encoded URI
+     */
     public void setDispatchPath(String path)
     {
         _dispatchPath=path;
@@ -158,15 +156,14 @@ public class AsyncContextEvent extends AsyncEvent implements Runnable
         Scheduler.Task task=_timeoutTask;
         _timeoutTask=null;
         if (task!=null)
-            _state.onTimeout();
+            _state.getHttpChannel().execute(() -> _state.onTimeout());
     }
 
     public void addThrowable(Throwable e)
     {
         if (_throwable==null)
             _throwable=e;
-        else
+        else if (_throwable != e)
             _throwable.addSuppressed(e);
     }
-
 }

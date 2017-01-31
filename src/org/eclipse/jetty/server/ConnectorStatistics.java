@@ -24,8 +24,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.util.annotation.ManagedAttribute;
@@ -43,7 +43,10 @@ import org.eclipse.jetty.util.statistic.SampleStatistic;
 /** A Connector.Listener that gathers Connector and Connections Statistics.
  * Adding an instance of this class as with {@link AbstractConnector#addBean(Object)} 
  * will register the listener with all connections accepted by that connector.
+ *
+ * @deprecated use {@link ServerConnectionStatistics} instead.
  */
+@Deprecated
 @ManagedObject("Connector Statistics")
 public class ConnectorStatistics extends AbstractLifeCycle implements Dumpable, Connection.Listener
 {
@@ -54,8 +57,8 @@ public class ConnectorStatistics extends AbstractLifeCycle implements Dumpable, 
     private final SampleStatistic _messagesOut = new SampleStatistic();
     private final SampleStatistic _connectionDurationStats = new SampleStatistic();
     private final ConcurrentMap<Connection, Sample> _samples = new ConcurrentHashMap<>();
-    private final AtomicInteger _closedIn = new AtomicInteger();
-    private final AtomicInteger _closedOut = new AtomicInteger();
+    private final LongAdder _closedIn = new LongAdder();
+    private final LongAdder _closedOut = new LongAdder();
     private AtomicLong _nanoStamp=new AtomicLong();
     private volatile int _messagesInPerSecond;
     private volatile int _messagesOutPerSecond;
@@ -75,8 +78,8 @@ public class ConnectorStatistics extends AbstractLifeCycle implements Dumpable, 
     {
         if (isStarted())
         {
-            int msgsIn=connection.getMessagesIn();
-            int msgsOut=connection.getMessagesOut();
+            long msgsIn=connection.getMessagesIn();
+            long msgsOut=connection.getMessagesOut();
             _messagesIn.set(msgsIn);
             _messagesOut.set(msgsOut);
             _connectionStats.decrement();
@@ -85,8 +88,8 @@ public class ConnectorStatistics extends AbstractLifeCycle implements Dumpable, 
             Sample sample=_samples.remove(connection);
             if (sample!=null)
             {
-                _closedIn.addAndGet(msgsIn-sample._messagesIn);
-                _closedOut.addAndGet(msgsOut-sample._messagesOut);
+                _closedIn.add(msgsIn-sample._messagesIn);
+                _closedOut.add(msgsOut-sample._messagesOut);
             }
         }
     }
@@ -267,8 +270,8 @@ public class ConnectorStatistics extends AbstractLifeCycle implements Dumpable, 
         {
             if (_nanoStamp.compareAndSet(then,now))
             {
-                long msgsIn=_closedIn.getAndSet(0);
-                long msgsOut=_closedOut.getAndSet(0);
+                long msgsIn=_closedIn.sumThenReset();
+                long msgsOut=_closedOut.sumThenReset();
 
                 for (Map.Entry<Connection, Sample> entry : _samples.entrySet())
                 {
@@ -302,7 +305,7 @@ public class ConnectorStatistics extends AbstractLifeCycle implements Dumpable, 
             _messagesOut=connection.getMessagesOut();
         }
         
-        final int _messagesIn;
-        final int _messagesOut;
+        final long _messagesIn;
+        final long _messagesOut;
     }
 }

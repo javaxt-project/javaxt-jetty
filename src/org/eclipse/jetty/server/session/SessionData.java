@@ -53,11 +53,16 @@ public class SessionData implements Serializable
     protected long _accessed;         // the time of the last access
     protected long _lastAccessed;     // the time of the last access excluding this one
     protected long _maxInactiveMs;
-    protected Map<String,Object> _attributes = new ConcurrentHashMap<String, Object>();
+    protected Map<String,Object> _attributes;
     protected boolean _dirty;
     protected long _lastSaved; //time in msec since last save
     
     public SessionData (String id, String cpath, String vhost, long created, long accessed, long lastAccessed, long maxInactiveMs)
+    {
+       this(id, cpath, vhost, created, accessed, lastAccessed, maxInactiveMs, new ConcurrentHashMap<String, Object>());
+    }
+
+    public SessionData (String id, String cpath, String vhost, long created, long accessed, long lastAccessed, long maxInactiveMs, Map<String,Object> attributes)
     {
         _id = id;
         setContextPath(cpath);
@@ -66,9 +71,9 @@ public class SessionData implements Serializable
         _accessed = accessed;
         _lastAccessed = lastAccessed;
         _maxInactiveMs = maxInactiveMs;
-        _expiry = calcExpiry();
+        calcAndSetExpiry();
+        _attributes = attributes;
     }
-
     
     /**
      * Copy the info from the given sessiondata
@@ -248,7 +253,22 @@ public class SessionData implements Serializable
     
     public long calcExpiry ()
     {
-        return (getMaxInactiveMs() <= 0 ? 0 : (System.currentTimeMillis() + getMaxInactiveMs()));
+        return calcExpiry(System.currentTimeMillis());
+    }
+    
+    public long calcExpiry (long time)
+    {
+        return (getMaxInactiveMs() <= 0 ? 0 : (time + getMaxInactiveMs()));
+    }
+    
+    public void calcAndSetExpiry (long time)
+    {
+        setExpiry(calcExpiry(time));
+    }
+    
+    public void calcAndSetExpiry ()
+    {
+        setExpiry(calcExpiry());
     }
 
     public long getCreated()
@@ -340,17 +360,16 @@ public class SessionData implements Serializable
         _lastNode = in.readUTF(); //last managing node
         _expiry = in.readLong(); 
         _maxInactiveMs = in.readLong();
-        _attributes = (ConcurrentHashMap<String,Object>)in.readObject();
+        _attributes = (Map<String,Object>)in.readObject();
     }
     
     public boolean isExpiredAt (long time)
     {
         if (LOG.isDebugEnabled())
-            LOG.debug("Testing expiry on session {}: Never expires? {} Is expired?{}", _id, (getExpiry()<= 0), (getExpiry() < time));
-        if (getExpiry() <= 0)
+            LOG.debug("Testing expiry on session {}: expires at {} now {} maxIdle {}", _id, getExpiry(), time, getMaxInactiveMs());
+        if (getMaxInactiveMs() <= 0)
             return false; //never expires
-        
-        return (getExpiry() < time);
+        return (getExpiry() <= time);
     }
     
     /** 

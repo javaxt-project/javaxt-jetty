@@ -151,7 +151,7 @@ public abstract class AbstractConnector extends ContainerLifeCycle implements Co
     private String _defaultProtocol;
     private ConnectionFactory _defaultConnectionFactory;
     private String _name;
-    private int _acceptorPriorityDelta;
+    private int _acceptorPriorityDelta=-2;
 
 
     /**
@@ -258,6 +258,14 @@ public abstract class AbstractConnector extends ContainerLifeCycle implements Co
         _defaultConnectionFactory = getConnectionFactory(_defaultProtocol);
         if(_defaultConnectionFactory==null)
             throw new IllegalStateException("No protocol factory for default protocol '"+_defaultProtocol+"' in "+this);
+        SslConnectionFactory ssl = getConnectionFactory(SslConnectionFactory.class);
+        if (ssl != null)
+        {
+            String next = ssl.getNextProtocol();
+            ConnectionFactory cf = getConnectionFactory(next);
+            if (cf == null)
+                throw new IllegalStateException("No protocol factory for SSL next protocol: '" + next + "' in " + this);
+        }
 
         super.doStart();
 
@@ -288,7 +296,7 @@ public abstract class AbstractConnector extends ContainerLifeCycle implements Co
     @Override
     public Future<Void> shutdown()
     {
-        return new FutureCallback(true);
+        try{return new FutureCallback(true);}catch(NoClassDefFoundError e){ return null; }
     }
 
     @Override
@@ -538,22 +546,22 @@ public abstract class AbstractConnector extends ContainerLifeCycle implements Co
                 LOG.warn(current);
             else
                 LOG.debug(current);
+            try
+            {
+                // Arbitrary sleep to avoid spin looping.
+                // Subclasses may decide for a different
+                // sleep policy or closing the connector.
+                Thread.sleep(1000);
+                return true;
+            }
+            catch (Throwable x)
+            {
+                return false;
+            }
         }
         else
         {
             LOG.ignore(current);
-        }
-
-        try
-        {
-            // Arbitrary sleep to avoid spin looping.
-            // Subclasses may decide for a different
-            // sleep policy or closing the connector.
-            Thread.sleep(1000);
-            return true;
-        }
-        catch (Throwable x)
-        {
             return false;
         }
     }

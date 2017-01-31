@@ -27,7 +27,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty.http.HttpField;
+import org.eclipse.jetty.http.CompressedContentFormat;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.MimeTypes;
@@ -35,6 +35,7 @@ import org.eclipse.jetty.http.PreEncodedHttpField;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.ResourceContentFactory;
 import org.eclipse.jetty.server.ResourceService;
+import org.eclipse.jetty.server.ResourceService.WelcomeFactory;
 import org.eclipse.jetty.server.handler.ContextHandler.Context;
 import org.eclipse.jetty.util.URIUtil;
 import org.eclipse.jetty.util.log.Log;
@@ -51,7 +52,7 @@ import org.eclipse.jetty.util.resource.ResourceFactory;
  *
  *
  */
-public class ResourceHandler extends HandlerWrapper implements ResourceFactory
+public class ResourceHandler extends HandlerWrapper implements ResourceFactory,WelcomeFactory
 {
     private static final Logger LOG = Log.getLogger(ResourceHandler.class);
 
@@ -61,40 +62,47 @@ public class ResourceHandler extends HandlerWrapper implements ResourceFactory
     MimeTypes _mimeTypes;
     private final ResourceService _resourceService;
     Resource _stylesheet;
-    String[] _welcomes =
-    { "index.html" };
+    String[] _welcomes = { "index.html" };
+
+    /* ------------------------------------------------------------ */
+    public ResourceHandler(ResourceService resourceService)
+    {
+        _resourceService=resourceService;
+    }
 
     /* ------------------------------------------------------------ */
     public ResourceHandler()
     {
-        _resourceService = new ResourceService()
+        this(new ResourceService()
         {
-            @Override
-            protected String getWelcomeFile(String pathInContext)
-            {
-                if (_welcomes == null)
-                    return null;
-
-                String welcome_servlet = null;
-                for (int i = 0; i < _welcomes.length; i++)
-                {
-                    String welcome_in_context = URIUtil.addPaths(pathInContext,_welcomes[i]);
-                    Resource welcome = getResource(welcome_in_context);
-                    if (welcome != null && welcome.exists())
-                        return _welcomes[i];
-                }
-                return welcome_servlet;
-            }
-
             @Override
             protected void notFound(HttpServletRequest request, HttpServletResponse response) throws IOException
             {
             }
-        };
-        _resourceService.setGzipEquivalentFileExtensions(new ArrayList<>(Arrays.asList(new String[]
-        { ".svgz" })));
+        });
+        _resourceService.setGzipEquivalentFileExtensions(new ArrayList<>(Arrays.asList(new String[] { ".svgz" })));
     }
 
+
+    /* ------------------------------------------------------------ */
+    @Override
+    public String getWelcomeFile(String pathInContext)
+    {
+        if (_welcomes == null)
+            return null;
+
+        String welcome_servlet = null;
+        for (int i = 0; i < _welcomes.length; i++)
+        {
+            String welcome_in_context = URIUtil.addPaths(pathInContext,_welcomes[i]);
+            Resource welcome = getResource(welcome_in_context);
+            if (welcome != null && welcome.exists())
+                return _welcomes[i];
+        }
+        return welcome_servlet;
+    }
+
+    
     /* ------------------------------------------------------------ */
     @Override
     public void doStart() throws Exception
@@ -103,7 +111,8 @@ public class ResourceHandler extends HandlerWrapper implements ResourceFactory
         _context = (scontext == null?null:scontext.getContextHandler());
         _mimeTypes = _context == null?new MimeTypes():_context.getMimeTypes();
 
-        _resourceService.setContentFactory(new ResourceContentFactory(this,_mimeTypes,_resourceService.isGzip()));
+        _resourceService.setContentFactory(new ResourceContentFactory(this,_mimeTypes,_resourceService.getPrecompressedFormats()));
+        _resourceService.setWelcomeFactory(this);
 
         super.doStart();
     }
@@ -319,9 +328,23 @@ public class ResourceHandler extends HandlerWrapper implements ResourceFactory
     /**
      * @return If set to true, then static content will be served as gzip content encoded if a matching resource is found ending with ".gz"
      */
+    @Deprecated
     public boolean isGzip()
     {
-        return _resourceService.isGzip();
+        for (CompressedContentFormat formats : _resourceService.getPrecompressedFormats())
+        {
+            if (CompressedContentFormat.GZIP._encoding.equals(formats._encoding))
+                return true;
+        }
+        return false;
+    }
+
+    /**
+     * @return Precompressed resources formats that can be used to serve compressed variant of resources.
+     */
+    public CompressedContentFormat[] getPrecompressedFormats()
+    {
+        return _resourceService.getPrecompressedFormats();
     }
 
     /* ------------------------------------------------------------ */
@@ -407,9 +430,10 @@ public class ResourceHandler extends HandlerWrapper implements ResourceFactory
      * @param gzip
      *            If set to true, then static content will be served as gzip content encoded if a matching resource is found ending with ".gz"
      */
+    @Deprecated
     public void setGzip(boolean gzip)
     {
-        _resourceService.setGzip(gzip);
+        setPrecompressedFormats(gzip?new CompressedContentFormat[]{CompressedContentFormat.GZIP}:new CompressedContentFormat[0]);
     }
 
     /* ------------------------------------------------------------ */
@@ -419,6 +443,16 @@ public class ResourceHandler extends HandlerWrapper implements ResourceFactory
     public void setGzipEquivalentFileExtensions(List<String> gzipEquivalentFileExtensions)
     {
         _resourceService.setGzipEquivalentFileExtensions(gzipEquivalentFileExtensions);
+    }
+
+    /**
+     * @param precompressedFormats
+     *            The list of precompresed formats to serve in encoded format if matching resource found.
+     *            For example serve gzip encoded file if ".gz" suffixed resource is found.
+     */
+    public void setPrecompressedFormats(CompressedContentFormat[] precompressedFormats)
+    {
+        _resourceService.setPrecompressedFormats(precompressedFormats);
     }
 
     /* ------------------------------------------------------------ */

@@ -16,15 +16,27 @@
 //  ========================================================================
 //
 
-
-package org.eclipse.jetty.server.session;
+package org.eclipse.jetty.util;
 
 /**
- * StalenessStrategy
- *
- *
+ * A {@link Throwable} that may be used in static contexts. It uses Java 7
+ * constructor that prevents setting stackTrace inside exception object.
  */
-public interface StalenessStrategy
+public class ConstantThrowable extends Throwable
 {
-    boolean isStale (Session session);
+    public ConstantThrowable()
+    {
+        this(null);
+    }
+
+    public ConstantThrowable(String name)
+    {
+        super(name, null, false, false);
+    }
+
+    @Override
+    public String toString()
+    {
+        return String.valueOf(getMessage());
+    }
 }

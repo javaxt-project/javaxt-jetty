@@ -29,12 +29,11 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
 
-import org.eclipse.jetty.util.TypeUtil;
-import org.eclipse.jetty.util.component.AbstractLifeCycle;
 import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.component.Dumpable;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
+import org.eclipse.jetty.util.thread.ExecutionStrategy;
 import org.eclipse.jetty.util.thread.Scheduler;
 
 /**
@@ -43,7 +42,7 @@ import org.eclipse.jetty.util.thread.Scheduler;
  * <p>{@link SelectorManager} subclasses implement methods to return protocol-specific
  * {@link EndPoint}s and {@link Connection}s.</p>
  */
-public abstract class SelectorManager extends AbstractLifeCycle implements Dumpable
+public abstract class SelectorManager extends ContainerLifeCycle implements Dumpable
 {
     public static final int DEFAULT_CONNECT_TIMEOUT = 15000;
     protected static final Logger LOG = Log.getLogger(SelectorManager.class);
@@ -96,25 +95,6 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
     public void setConnectTimeout(long milliseconds)
     {
         _connectTimeout = milliseconds;
-    }
-
-    /**
-     * @return the selector priority delta
-     * @deprecated not implemented
-     */
-    @Deprecated
-    public int getSelectorPriorityDelta()
-    {
-        return 0;
-    }
-
-    /**
-     * @param selectorPriorityDelta the selector priority delta
-     * @deprecated not implemented
-     */
-    @Deprecated
-    public void setSelectorPriorityDelta(int selectorPriorityDelta)
-    {
     }
 
     /**
@@ -251,14 +231,13 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
     @Override
     protected void doStart() throws Exception
     {
-        super.doStart();
         for (int i = 0; i < _selectors.length; i++)
         {
             ManagedSelector selector = newSelector(i);
             _selectors[i] = selector;
-            selector.start();
-            execute(selector);
+            addBean(selector);
         }
+        super.doStart();
     }
 
     /**
@@ -275,9 +254,9 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
     @Override
     protected void doStop() throws Exception
     {
-        for (ManagedSelector selector : _selectors)
-            selector.stop();
         super.doStop();
+        for (ManagedSelector selector : _selectors)
+            removeBean(selector);
     }
 
     /**
@@ -287,7 +266,6 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
      */
     protected void endPointOpened(EndPoint endpoint)
     {
-        endpoint.onOpen();
     }
 
     /**
@@ -341,12 +319,12 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
     {
         return ((SocketChannel)channel).finishConnect();
     }
-    
+
     protected boolean isConnectionPending(SelectableChannel channel)
     {
         return ((SocketChannel)channel).isConnectionPending();
     }
-    
+
     protected SelectableChannel doAccept(SelectableChannel server) throws IOException
     {
         return ((ServerSocketChannel)server).accept();
@@ -370,7 +348,7 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
     {
         return Selector.open();
     }
-    
+
     /**
      * <p>Factory method to create {@link EndPoint}.</p>
      * <p>This method is invoked as a result of the registration of a channel via {@link #connect(SelectableChannel, Object)}
@@ -395,18 +373,4 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
      * @throws IOException if unable to create new connection
      */
     public abstract Connection newConnection(SelectableChannel channel, EndPoint endpoint, Object attachment) throws IOException;
-
-    @Override
-    public String dump()
-    {
-        return ContainerLifeCycle.dump(this);
-    }
-
-    @Override
-    public void dump(Appendable out, String indent) throws IOException
-    {
-        ContainerLifeCycle.dumpObject(out, this);
-        ContainerLifeCycle.dump(out, indent, TypeUtil.asList(_selectors));
-    }
-    
 }

@@ -20,20 +20,11 @@
 package org.eclipse.jetty.server.session;
 
 /**
- * AlwaysStale
+ * SessionDataStoreFactory
  *
  *
  */
-public class AlwaysStaleStrategy implements StalenessStrategy
+public interface SessionDataStoreFactory
 {
-
-    /** 
-     * @see org.eclipse.jetty.server.session.StalenessStrategy#isStale(org.eclipse.jetty.server.session.Session)
-     */
-    @Override
-    public boolean isStale(Session session)
-    {
-       return true;
-    }
-
+    SessionDataStore getSessionDataStore (SessionHandler handler) throws Exception;
 }

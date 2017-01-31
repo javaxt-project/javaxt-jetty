@@ -242,6 +242,7 @@ public class FileSessionDataStore extends AbstractSessionDataStore
             }
             catch (Exception e)
             { 
+                e.printStackTrace();
                 if (file != null) 
                     file.delete(); // No point keeping the file if we didn't save the whole session
                 throw new UnwriteableSessionDataException(id, _context,e);             
@@ -452,6 +453,15 @@ public class FileSessionDataStore extends AbstractSessionDataStore
             }
             data.putAllAttributes(attributes);
         }
+    }
+
+    /** 
+     * @see org.eclipse.jetty.server.session.AbstractSessionDataStore#toString()
+     */
+    @Override
+    public String toString()
+    {
+        return String.format("%s[dir=%s,deleteUnrestorableFiles=%b]",super.toString(),_storeDir,_deleteUnrestorableFiles);
     }
 
 

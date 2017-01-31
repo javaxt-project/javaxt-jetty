@@ -50,7 +50,7 @@ public abstract class HttpServlet extends AbstractHandler {
         this.servletContext = new ServletContext(servletContext);
         String jettyVersion = servletContext.getServerInfo();
         String javaxtVersion = this.servletContext.getServerInfo(); //I suggest leaving this in to avoid start up costs
-        System.out.println(javaxtVersion + " (" + jettyVersion + ")"); 
+        //System.out.println(javaxtVersion + " (" + jettyVersion + ")"); 
         init(null);
     }
     

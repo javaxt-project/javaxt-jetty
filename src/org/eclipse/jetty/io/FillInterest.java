@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
+import org.eclipse.jetty.util.thread.Invocable;
+import org.eclipse.jetty.util.thread.Invocable.InvocationType;
 
 /**
  * A Utility class to help implement {@link EndPoint#fillInterested(Callback)}
@@ -53,24 +55,37 @@ public abstract class FillInterest
      */
     public void register(Callback callback) throws ReadPendingException
     {
-        if (callback == null)
-            throw new IllegalArgumentException();
-
-        if (_interested.compareAndSet(null, callback))
-        {
-            if (LOG.isDebugEnabled())
-            {
-                LOG.debug("{} register {}",this,callback);
-                _lastSet=new Throwable(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()) + ":" + Thread.currentThread().getName());
-            }
-        }
-        else
+        if (!tryRegister(callback))
         {
             LOG.warn("Read pending for {} prevented {}", _interested, callback);
             if (LOG.isDebugEnabled())
                 LOG.warn("callback set at ",_lastSet);
             throw new ReadPendingException();
+        }   
+    }
+    
+    /**
+     * Call to register interest in a callback when a read is possible.
+     * The callback will be called either immediately if {@link #needsFillInterest()}
+     * returns true or eventually once {@link #fillable()} is called.
+     *
+     * @param callback the callback to register
+     * @return true if the register succeeded
+     */
+    public boolean tryRegister(Callback callback)
+    {
+        if (callback == null)
+            throw new IllegalArgumentException();
+
+        if (!_interested.compareAndSet(null, callback))
+            return false;
+
+        if (LOG.isDebugEnabled())
+        {
+            LOG.debug("{} register {}",this,callback);
+            _lastSet=new Throwable(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()) + ":" + Thread.currentThread().getName());
         }
+        
         try
         {
             if (LOG.isDebugEnabled())
@@ -81,6 +96,8 @@ public abstract class FillInterest
         {
             onFail(e);
         }
+        
+        return true;
     }
 
     /**
@@ -105,10 +122,10 @@ public abstract class FillInterest
         return _interested.get() != null;
     }
     
-    public boolean isCallbackNonBlocking()
+    public InvocationType getCallbackInvocationType()
     {
         Callback callback = _interested.get();
-        return callback!=null && callback.isNonBlocking();
+        return Invocable.getInvocationType(callback);
     }
 
     /**

@@ -32,6 +32,8 @@ import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
+import org.eclipse.jetty.util.thread.Invocable;
+import org.eclipse.jetty.util.thread.Invocable.InvocationType;
 
 
 /**
@@ -268,19 +270,26 @@ abstract public class WriteFlusher
             if (_callback!=null)
                 _callback.succeeded();
         }
-        
-        boolean isCallbackNonBlocking()
+
+        InvocationType getCallbackInvocationType()
         {
-            return _callback!=null && _callback.isNonBlocking();
+            return Invocable.getInvocationType(_callback);
+        }
+
+        public Object getCallback()
+        {
+            return _callback;
         }
     }
 
-    public boolean isCallbackNonBlocking()
+    public InvocationType getCallbackInvocationType()
     {
         State s = _state.get();
-        return (s instanceof PendingState) && ((PendingState)s).isCallbackNonBlocking();
+        return (s instanceof PendingState)
+                ?((PendingState)s).getCallbackInvocationType()
+                :Invocable.InvocationType.BLOCKING;
     }
-    
+
     /**
      * Abstract call to be implemented by specific WriteFlushers. It should schedule a call to {@link #completeWrite()}
      * or {@link #onFail(Throwable)} when appropriate.
@@ -355,7 +364,7 @@ abstract public class WriteFlusher
      * {@link #onFail(Throwable)} or {@link #onClose()}
      */
     public void completeWrite()
-    {         
+    {
         if (DEBUG)
             LOG.debug("completeWrite: {}", this);
 
@@ -404,8 +413,9 @@ abstract public class WriteFlusher
         }
     }
 
-    /* ------------------------------------------------------------ */
-    /** Flush the buffers iteratively until no progress is made
+    /**
+     * Flushes the buffers iteratively until no progress is made.
+     *
      * @param buffers The buffers to flush
      * @return The unflushed buffers, or null if all flushed
      * @throws IOException if unable to flush
@@ -418,15 +428,15 @@ abstract public class WriteFlusher
             int before=buffers.length==0?0:buffers[0].remaining();
             boolean flushed=_endPoint.flush(buffers);
             int r=buffers.length==0?0:buffers[0].remaining();
-            
+
             if (LOG.isDebugEnabled())
                 LOG.debug("Flushed={} {}/{}+{} {}",flushed,before-r,before,buffers.length-1,this);
-            
+
             if (flushed)
                 return null;
-            
+
             progress=before!=r;
-            
+
             int not_empty=0;
             while(r==0)
             {
@@ -442,17 +452,17 @@ abstract public class WriteFlusher
 
             if (not_empty>0)
                 buffers=Arrays.copyOfRange(buffers,not_empty,buffers.length);
-        }        
+        }
 
         if (LOG.isDebugEnabled())
             LOG.debug("!fully flushed {}",this);
-        
+
         // If buffers is null, then flush has returned false but has consumed all the data!
         // This is probably SSL being unable to flush the encrypted buffer, so return EMPTY_BUFFERS
         // and that will keep this WriteFlusher pending.
         return buffers==null?EMPTY_BUFFERS:buffers;
     }
-    
+
     /* ------------------------------------------------------------ */
     /** Notify the flusher of a failure
      * @param cause The cause of the failure
@@ -494,8 +504,6 @@ abstract public class WriteFlusher
 
     public void onClose()
     {
-        if (_state.get()==__IDLE)
-            return;
         onFail(new ClosedChannelException());
     }
 
@@ -520,9 +528,10 @@ abstract public class WriteFlusher
     @Override
     public String toString()
     {
-        return String.format("WriteFlusher@%x{%s}", hashCode(), _state.get());
+        State s = _state.get();
+        return String.format("WriteFlusher@%x{%s}->%s", hashCode(), s,s instanceof PendingState?((PendingState)s).getCallback():null);
     }
-    
+
     public String toStateString()
     {
         switch(_state.get().getType())

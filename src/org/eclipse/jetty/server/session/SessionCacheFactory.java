@@ -20,21 +20,11 @@
 package org.eclipse.jetty.server.session;
 
 /**
- * NeverStale
+ * SessionCacheFactory
  *
- * This strategy says that a session never needs to be refreshed by the cluster.
- * 
+ *
  */
-public class NeverStaleStrategy implements StalenessStrategy
+public interface SessionCacheFactory
 {
-
-    /** 
-     * @see org.eclipse.jetty.server.session.StalenessStrategy#isStale(org.eclipse.jetty.server.session.Session)
-     */
-    @Override
-    public boolean isStale(Session session)
-    {
-        return false;
-    }
-
+    SessionCache getSessionCache (SessionHandler handler);
 }

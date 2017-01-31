@@ -21,53 +21,72 @@ package org.eclipse.jetty.server.session;
 
 import java.util.Set;
 
+import org.eclipse.jetty.util.component.ContainerLifeCycle;
+import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.log.Logger;
+
+
 /**
  * CachingSessionDataStore
  *
  * A SessionDataStore is a mechanism for (persistently) storing data associated with sessions.
  * This implementation delegates to a pluggable SessionDataStore for actually storing the 
- * session data. It also uses a pluggable JCache implementation in front of the 
+ * session data. It also uses a pluggable cache implementation in front of the 
  * delegate SessionDataStore to improve performance: accessing most persistent store
  * technology can be expensive time-wise, so introducing a fronting cache 
  * can increase performance. The cache implementation can either be a local cache, 
  * a remote cache, or a clustered cache.
+ * 
+ * The implementation here will try to read first from the cache and fallback to 
+ * reading from the SessionDataStore if the session key is not found. On writes, the
+ * session data is written first to the SessionDataStore, and then to the cache. On 
+ * deletes, the data is deleted first from the SessionDataStore, and then from the
+ * cache. There is no transaction manager ensuring atomic operations, so it is
+ * possible that failures can result in cache inconsistency.
+ * 
  */
-public class CachingSessionDataStore extends AbstractSessionDataStore
+public class CachingSessionDataStore extends ContainerLifeCycle implements SessionDataStore
 {
-
-    public interface SessionDataCache
+    private  final static Logger LOG = Log.getLogger("org.eclipse.jetty.server.session");
+    /**
+     * The actual store for the session data
+     */
+    protected SessionDataStore _store;
+    
+    
+    /**
+     * The fronting cache
+     */
+    protected SessionDataMap _cache;
+    
+    
+    /**
+     * @param cache
+     * @param store
+     */
+    public CachingSessionDataStore (SessionDataMap cache, SessionDataStore store)
     {
-        public SessionData get (String id); //get mapped value
-        public boolean putIfAbsent (String id, SessionData data); //only insert if no mapping for key already
-        public boolean remove (String id); //remove the mapping for key, returns false if no mapping
-        public void put (String id, SessionData data); //overwrite or add the mapping
-        public void initialize(SessionContext context);
-    }
-    
-    
-    protected SessionDataStore _delegateDataStore;
-    protected SessionDataCache _cache;
-    
-    
-    public void setSessionDataStore (SessionDataStore store)
-    {
-        checkStarted();
-        _delegateDataStore = store;
-    }
-    
-    public SessionDataStore getSessionDataStore()
-    {
-        return _delegateDataStore;
-    }
-    
-    
-    public void setSessionDataCache (SessionDataCache cache)
-    {
-        checkStarted();
         _cache = cache;
+        addBean(_cache,true);
+        _store = store;
+        addBean(_store,true);
+    }
+   
+    
+    /**
+     * @return the delegate session store
+     */
+    public SessionDataStore getSessionStore()
+    {
+        return _store;
     }
     
-    public SessionDataCache getSessionDataCache ()
+    
+    
+    /**
+     * @return the fronting cache for session data 
+     */
+    public SessionDataMap getSessionDataMap ()
     {
         return _cache;
     }
@@ -79,25 +98,25 @@ public class CachingSessionDataStore extends AbstractSessionDataStore
     @Override
     public SessionData load(String id) throws Exception
     {
-        //check to see if the session data is already in our cache
-        SessionData d = _cache.get(id);
-        if (d == null)
+        SessionData d = null;
+
+
+        try
         {
-            //not in the cache, go get it from the store
-           d =  _delegateDataStore.load(id);
-           
-           //put it into the cache, unless another thread/node has put it into the cache
-          boolean inserted = _cache.putIfAbsent(id, d);
-          if (!inserted)
-          {
-              //some other thread/node put this data into the cache, so get it from there
-              SessionData d2 = _cache.get(id);
-              
-              if (d2 != null)
-                  d = d2;
-             //else: The cache either timed out the entry, or maybe the session data was being removed, and we're about to resurrect it!
-          }
+            //check to see if the session data is already in the cache
+            d = _cache.load(id);
         }
+        catch (Exception e)
+        {
+            LOG.warn(e);
+        }
+
+        if (d != null)
+            return d; //cache hit
+
+        //cache miss - go get it from the store
+        d = _store.load(id);
+
         return d;
     }
 
@@ -108,53 +127,49 @@ public class CachingSessionDataStore extends AbstractSessionDataStore
     @Override
     public boolean delete(String id) throws Exception
     {
-        //delete from the store and from the cache
-        _delegateDataStore.delete(id);
-        _cache.remove(id);
-        //TODO need to check removal at each level?
-        return false;
+        //delete from the store
+        boolean deleted = _store.delete(id);
+        //and from the cache
+        _cache.delete(id);
+        
+        return deleted;
     }
 
     /** 
      * @see org.eclipse.jetty.server.session.SessionDataStore#getExpired(Set)
      */
     @Override
-    public Set<String> doGetExpired(Set<String> candidates)
+    public Set<String> getExpired(Set<String> candidates)
     {
-        // TODO Auto-generated method stub
-        return null;
+        //pass thru to the delegate store
+        return _store.getExpired(candidates);
     }
 
-
+    
+    
     /** 
-     * @see org.eclipse.jetty.server.session.AbstractSessionDataStore#doStore(java.lang.String, org.eclipse.jetty.server.session.SessionData, long)
+     * @see org.eclipse.jetty.server.session.SessionDataStore#store(java.lang.String, org.eclipse.jetty.server.session.SessionData)
      */
     @Override
-    public void doStore(String id, SessionData data, long lastSaveTime) throws Exception
+    public void store(String id, SessionData data) throws Exception
     {
         //write to the SessionDataStore first
-        if (_delegateDataStore instanceof AbstractSessionDataStore)
-            ((AbstractSessionDataStore)_delegateDataStore).doStore(id, data, lastSaveTime);
-
-        //else??????
-        
+        _store.store(id, data);
         //then update the cache with written data
-        _cache.put(id,data);
-
+        _cache.store(id,data);
     }
+
+  
 
     @Override
     protected void doStart() throws Exception
     {
-        _cache.initialize(_context);
-        _delegateDataStore.initialize(_context);
         super.doStart();
     }
 
     @Override
     protected void doStop() throws Exception
     {
-        // TODO Auto-generated method stub
         super.doStop();
     }
 
@@ -164,7 +179,7 @@ public class CachingSessionDataStore extends AbstractSessionDataStore
     @Override
     public boolean isPassivating()
     {
-       return true;
+       return _store.isPassivating();
     }
 
     /** 
@@ -173,7 +188,40 @@ public class CachingSessionDataStore extends AbstractSessionDataStore
     @Override
     public boolean exists(String id) throws Exception
     {
-        // TODO Auto-generated method stub
-        return false;
+        try
+        {
+            //check the cache first
+            SessionData data = _cache.load(id);
+            if (data != null)
+                return true;
+        }
+        catch (Exception e)
+        {
+            LOG.warn(e);
+        }
+
+        //then the delegate store
+        return _store.exists(id);
+    }
+
+
+    /** 
+     * @see org.eclipse.jetty.server.session.SessionDataStore#initialize(org.eclipse.jetty.server.session.SessionContext)
+     */
+    @Override
+    public void initialize(SessionContext context) throws Exception
+    {
+        //pass through
+        _store.initialize(context);
+        _cache.initialize(context);
+    }
+
+    /** 
+     * @see org.eclipse.jetty.server.session.SessionDataStore#newSessionData(java.lang.String, long, long, long, long)
+     */
+    @Override
+    public SessionData newSessionData(String id, long created, long accessed, long lastAccessed, long maxInactiveMs)
+    {
+        return _store.newSessionData(id, created, accessed, lastAccessed, maxInactiveMs);
     }
 }
