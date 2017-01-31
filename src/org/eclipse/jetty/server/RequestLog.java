@@ -18,7 +18,7 @@
 
 package org.eclipse.jetty.server; 
 
-import org.eclipse.jetty.server.handler.RequestLogHandler;
+//import org.eclipse.jetty.server.handler.RequestLogHandler;
 
 /** 
  * A <code>RequestLog</code> can be attached to a {@link org.eclipse.jetty.server.handler.RequestLogHandler} to enable 

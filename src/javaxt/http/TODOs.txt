@@ -2,27 +2,39 @@ How to handle:
 - Chunked encoding
 - Range requests
 
-Do we need these packages:
-- GZIP
-
-Interesting packages to explore:
- - authentication
- 
- 
  
 Changes to the Jetty source:
  
-org.eclipse.jetty.server.Server
-  - commented out import for org.eclipse.jetty.server.handler.StatisticsHandler
-  
+(1) org.eclipse.jetty.server.AbstractConnector
 
-  
-org.eclipse.jetty.util.log.Log
-  - Added hack for JavaXT:
-    props.setProperty("org.eclipse.jetty.util.log.class","javaxt.http.ServerLog");
-    
-    
-    
-Deleted:
-    org.eclipse.jetty.server.Slf4jRequestLog
-    org.eclipse.jetty.server.handler.HandlerList
+The Jetty source code sporadically throws an exception when shutting down javaxt-server. Example:
+
+    Exception in thread "Thread-1" java.lang.NoClassDefFoundError: org/eclipse/jetty/util/FutureCallback
+        at org.eclipse.jetty.server.AbstractConnector.shutdown(AbstractConnector.java:299)
+        at org.eclipse.jetty.server.AbstractNetworkConnector.shutdown(AbstractNetworkConnector.java:108)
+        at org.eclipse.jetty.server.ServerConnector.shutdown(ServerConnector.java:318)
+        at org.eclipse.jetty.server.Server.doStop(Server.java:472)
+        at org.eclipse.jetty.util.component.AbstractLifeCycle.stop(AbstractLifeCycle.java:89)
+        at org.eclipse.jetty.util.thread.ShutdownThread.run(ShutdownThread.java:138)
+    Caused by: java.lang.ClassNotFoundException: org.eclipse.jetty.util.FutureCallback
+        at java.net.URLClassLoader.findClass(Unknown Source)
+        at java.lang.ClassLoader.loadClass(Unknown Source)
+        at sun.misc.Launcher$AppClassLoader.loadClass(Unknown Source)
+        at java.lang.ClassLoader.loadClass(Unknown Source)
+        ... 6 more
+
+
+To circumvent this issue, I added a try/catch block in the org.eclipse.jetty.server.AbstractConnector class:
+
+    @Override
+    public Future<Void> shutdown()
+    {
+        try{return new FutureCallback(true);}catch(NoClassDefFoundError e){ return null; }
+    }
+
+
+(2) org.eclipse.jetty.server.Server
+    Commented out unused import for org.eclipse.jetty.server.handler.StatisticsHandler
+
+(3) org.eclipse.jetty.server.RequestLog
+    Commented out unused import for org.eclipse.jetty.server.handler.RequestLogHandler;
