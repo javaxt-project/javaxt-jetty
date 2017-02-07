@@ -4,9 +4,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.zip.GZIPOutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileChannel.MapMode;
+import java.nio.file.StandardOpenOption;
 import java.util.Calendar;
 import java.util.TimeZone;
-
 import org.eclipse.jetty.server.HttpOutput;
 
 
@@ -27,14 +29,9 @@ public class HttpServletResponse {
 
     private Integer statusCode;
     private String statusMessage;
-//    private java.util.HashMap<String, String> headers;
-    private boolean writeHeader = true;
-//    private Boolean chunked = null;
     private int bufferSize = 8096; //8KB
     private static final String z = "GMT";
     private static final TimeZone tz = TimeZone.getTimeZone(z);
-//
-//    private static final ByteBuffer CRLF = getCRLF();
     private String charSet = "UTF-8";
 //    private java.util.Locale locale = java.util.Locale.getDefault();
 //    private java.util.ArrayList<Cookie> cookies = new java.util.ArrayList<Cookie>();
@@ -52,7 +49,7 @@ public class HttpServletResponse {
         
         
       //Set default response headers
-        setHeader("Accept-Ranges", "bytes");
+        //setHeader("Accept-Ranges", "bytes");
         setHeader("Connection", (request.isKeepAlive() ? "Keep-Alive" : "Close"));
         setHeader("Server", request.getServletContext().getServerInfo());
         setHeader("Date", getDate(Calendar.getInstance()));
@@ -548,7 +545,6 @@ public class HttpServletResponse {
 
               //Ensure that the Content Encoding is correct and write the header
                 setHeader("Content-Encoding", "gzip");
-                writeHeader();
 
               //Write the body
                 ByteBuffer output = ByteBuffer.allocateDirect(bytes.length);
@@ -565,24 +561,27 @@ public class HttpServletResponse {
 
               //Write header before sending the file contents. Ensure that
               //the output is chunked and the content encoding is correct.
+                setHeader("Content-Length", null);
                 setHeader("Transfer-Encoding", "chunked");
                 setHeader("Content-Encoding", "gzip");
-                writeHeader();
+
 
               //Incrementally compress the byte array and chunk the output
-                GZIPOutputStream out = new GZIPOutputStream(response.getOutputStream(), bufferSize);
+                HttpOutput out = (HttpOutput) response.getOutputStream(); 
+                out.setBufferSize(bufferSize);
+                GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize);
                 java.io.InputStream inputStream = new ByteArrayInputStream(bytes);
                 byte[] b = new byte[bufferSize];
                 int x=0;
                 while ( (x = inputStream.read(b)) != -1) {
-                    out.write(b,0,x);
+                    gz.write(b,0,x);
                 }
                 inputStream.close();
 
-                out.finish();
-                out.close();
+                gz.finish();
+                gz.close();
 
-                out = null;
+                gz = null;
                 b = null;
 
             }
@@ -591,12 +590,12 @@ public class HttpServletResponse {
 
           //Write header before sending the file contents.
             setContentLength(bytes.length);
-            writeHeader();
 
 
           //Send the contents of the byte array to the client
             java.io.InputStream inputStream = new ByteArrayInputStream(bytes);
-            java.io.OutputStream out = response.getOutputStream();
+            HttpOutput out = (HttpOutput) response.getOutputStream(); 
+            out.setBufferSize(bufferSize);
             byte[] b = new byte[bufferSize];
 
             int x=0;
@@ -697,6 +696,16 @@ public class HttpServletResponse {
         }
 
 
+      //If the file is small enough, send the file.
+        if (fileSize<=bufferSize){
+            setContentLength(fileSize);
+            HttpOutput out = (HttpOutput) response.getOutputStream(); 
+            out.setBufferSize(bufferSize);
+            out.sendContent(FileChannel.open(file.toPath(), StandardOpenOption.READ));
+            return;
+        }        
+        
+        
       //Check whether to compress the response
         boolean gzip = false;
         String acceptEncoding = request.getHeader("Accept-Encoding");
@@ -706,39 +715,33 @@ public class HttpServletResponse {
             }
         }
 
-        
-      //If the file is small, don't gzip?
-        if (gzip)
-        if (file.length()<=bufferSize){
-            gzip = false;
-        }
-        
-        
+
 
       //Dump file contents to servlet output stream
         if (gzip){
 
           //Write header before sending the file contents. Ensure that the
           //output is chunked and the content encoding is correct.
+            setHeader("Content-Length", null);
             setHeader("Transfer-Encoding", "chunked");
             setHeader("Content-Encoding", "gzip");
-            writeHeader();
 
 
-            
-            GZIPOutputStream out = new GZIPOutputStream(response.getOutputStream(), bufferSize);
+            HttpOutput out = (HttpOutput) response.getOutputStream(); 
+            out.setBufferSize(bufferSize);
+            GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize);
             java.io.InputStream inputStream = new java.io.FileInputStream(file);
             byte[] b = new byte[bufferSize];
             int x=0;
             while ( (x = inputStream.read(b)) != -1) {
-                out.write(b,0,x);
+                gz.write(b,0,x);
             }
             inputStream.close();
 
-            out.finish();
-            out.close();
+            gz.finish();
+            gz.close();
 
-            out = null;
+            gz = null;
             b = null;
 
         }
@@ -746,39 +749,36 @@ public class HttpServletResponse {
 
           //Write header before sending the file contents.
             setContentLength(fileSize);
-            writeHeader();
 
-
-
+            
+          //Send file using Jetty's ByteBuffer API. Note how the file mapped 
+          //buffers are stored in a ConcurrentHashMap cache to be shared between 
+          //multiple requests. The call to asReadOnlyBuffer() only creates a 
+          //position/limit indexes and does not copy the underlying data, which 
+          //is written directly by the operating system from the file system to 
+          //the network.
           //https://webtide.com/servlet-3-1-async-io-and-jetty/
-          
-            /*
+            String path = file.getPath();
             ByteBuffer mapped=cache.get(path);
             if (mapped==null){
                 
                 try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "r"))
                 {
-                  ByteBuffer buf = raf.getChannel().map(java.nio.channels.FileChannel.MapMode.READ_ONLY,0,raf.length());
-                  mapped=cache.putIfAbsent(path,buf);
-                  if (mapped==null)
-                    mapped=buf;
+                    ByteBuffer buf = raf.getChannel().map(MapMode.READ_ONLY, 0, raf.length());
+                    mapped=cache.putIfAbsent(path,buf);
+                    if (mapped==null) mapped=buf;
                 }
             }
-            */
-
-            
-          //Send the contents of a file to the client
-            java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "r");
-            ByteBuffer mapped = raf.getChannel().map(java.nio.channels.FileChannel.MapMode.READ_ONLY,0,raf.length());
             write(mapped.asReadOnlyBuffer());
         }
     }
     
+    private java.util.concurrent.ConcurrentHashMap<String, ByteBuffer> cache = new java.util.concurrent.ConcurrentHashMap<>();
     
   /** */
     public void write(ByteBuffer content) throws IOException {
-        //final javax.servlet.ServletOutputStream out = response.getOutputStream();  
-        final HttpOutput out = (HttpOutput) response.getOutputStream();  
+        final HttpOutput out = (HttpOutput) response.getOutputStream();
+        out.setBufferSize(bufferSize);
         final javax.servlet.AsyncContext async = request.startAsync();
         out.setWriteListener(new javax.servlet.WriteListener(){
 
@@ -831,9 +831,9 @@ public class HttpServletResponse {
 
 
       //Write header before sending the file contents. 
+        setHeader("Content-Length", null);
         setHeader("Transfer-Encoding", "chunked");
         if (gzip) setHeader("Content-Encoding", "gzip");
-        writeHeader();
 
 
       //Write body. Compress as needed.
@@ -896,32 +896,6 @@ public class HttpServletResponse {
    */
     public java.io.PrintWriter getWriter() throws IOException{
         return response.getWriter();
-    }
-
-
-  //**************************************************************************
-  //** writeHeader
-  //**************************************************************************
-  /**  Used to write the http header to the response.
-   */
-    private void writeHeader() throws IOException {
-
-        if (writeHeader==false) return;
-        else{
-
-            getHeader();
-            
-            
-//            byte[] header = getHeader().getBytes(charSet);
-//            ByteBuffer output = ByteBuffer.allocateDirect(header.length);
-//            output.put(header);
-//            output.flip();
-//            write(output, output.capacity());
-//            output.clear();
-//            output = null;
-
-            writeHeader = false;
-        }
     }
 
 
