@@ -23,6 +23,7 @@ import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.component.LifeCycle;
+import org.eclipse.jetty.util.annotation.ManagedObject;
 import org.eclipse.jetty.util.annotation.Name;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.log.AbstractLogger;
@@ -32,21 +33,9 @@ import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.io.ssl.SslConnection;
 
 import org.eclipse.jetty.http.HttpVersion;
-
-
-import org.eclipse.jetty.server.SslConnectionFactory;
-import org.eclipse.jetty.server.SecureRequestCustomizer;
-
 //import org.eclipse.jetty.http2.server.HTTP2ServerConnectionFactory;
 //import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
-import org.eclipse.jetty.util.annotation.ManagedObject;
-
-
-
-
 //import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
-
-
 
 
 
@@ -374,8 +363,6 @@ public class Server extends Thread {
         }
     }
 
-    
-
 
 
   //**************************************************************************
@@ -414,13 +401,19 @@ public class Server extends Thread {
         @Override public Connection newConnection(final Connector connector, final EndPoint realEndPoint) {
             final ReadAheadEndpoint aheadEndpoint = new ReadAheadEndpoint(realEndPoint, 1);
             final byte[] bytes = aheadEndpoint.getBytes();
-            final boolean isSSL;
+            boolean isSSL = false;
             if (bytes == null || bytes.length == 0) {
                 //System.out.println("NO-Data in newConnection : "+aheadEndpoint.getRemoteAddress());
                 isSSL = true;
-            } else {
+            } 
+            else {
                 final byte b = bytes[0];    // TLS first byte is 0x16 , SSLv2 first byte is >= 0x80 , HTTP is guaranteed many bytes of ASCII
-                isSSL = b >= 0x7F || (b < 0x20 && b != '\n' && b != '\r' && b != '\t');            
+                isSSL = b >= 0x7F || (b < 0x20 && b != '\n' && b != '\r' && b != '\t');    
+
+//              //If this is the first byte, check whether the request is SSL
+//                if ((b>19 && b<25) || b==-128){
+//                    isSSL = true;
+//                }
             }
             //System.out.println("newConnection["+isSSL+"] : "+aheadEndpoint.getRemoteAddress());
 
@@ -433,7 +426,8 @@ public class Server extends Thread {
                 sslConnection.setRenegotiationAllowed(this._sslContextFactory.isRenegotiationAllowed());
                 this.configure(sslConnection, connector, aheadEndpoint);
                 plainEndpoint = sslConnection.getDecryptedEndPoint();
-            } else {
+            } 
+            else {
                 sslConnection = null;
                 plainEndpoint = aheadEndpoint;
             }
@@ -490,18 +484,43 @@ public class Server extends Thread {
             public byte[] getBytes() { if (pendingException == null) { try { readAhead(); } catch (final IOException e) { pendingException = e; } } return bytes; }
             private void throwPendingException() throws IOException { if (pendingException != null) { final IOException e = pendingException; pendingException = null; throw e; } }
 
-            public ReadAheadEndpoint(final EndPoint channel, final int readAheadLength){
+            public ReadAheadEndpoint(final EndPoint channel, final int readAheadLength){                
                 this.endPoint = channel;
                 start = ByteBuffer.wrap(bytes = new byte[readAheadLength]);
                 start.flip();
                 leftToRead = readAheadLength;
             }
-
+            
             private synchronized void readAhead() throws IOException {
                 if (leftToRead > 0) {
-                    final int n = endPoint.fill(start);
-                    if (n == -1) { leftToRead = -1; }
-                    else         {  leftToRead -= n; }
+                    
+                    int numBytesRead = endPoint.fill(start);
+                    int numRetries = 0;
+                                                                                
+                    if (numBytesRead==0){
+
+
+                        while ((numBytesRead = endPoint.fill(start))<1) {
+
+                            if (numBytesRead==-1) throw new IOException("Received -1 bytes. Socket is closed.");
+
+                            numRetries++;
+                            if (numRetries>15000){
+                                throw new IOException("Timeout waiting for bytes from the client.");
+                            }
+
+                            try {
+                                Thread.sleep(1);
+                            }
+                            catch (InterruptedException e) {
+                                throw new IOException("Interrupt!");
+                            }
+                        }
+
+                    }
+
+                    if (numBytesRead==-1) throw new IOException("Received -1 bytes. Socket is closed.");
+                    leftToRead -= numBytesRead;
                     if (leftToRead <= 0) start.rewind();
                 }
             }
@@ -534,112 +553,96 @@ public class Server extends Thread {
     }    
     
     
-    
-    
 
+  //**************************************************************************
+  //** ServerLog
+  //**************************************************************************
+  /** Implementation of a Jetty Logger. This logger actually doesn't log 
+   *  anything. You can use a different logger at any time by calling
+   *  org.eclipse.jetty.util.log.Log.setLog();
+   */
+    @ManagedObject("JavaXT Logging Implementation")
+    public static class Log extends AbstractLogger{
 
-//******************************************************************************
-//**  ServerLog
-//******************************************************************************
-/**
- *   Implementation of a Jetty Logger. This logger actually doesn't log 
- *   anything. You can use a different logger at any time by calling
- *   org.eclipse.jetty.util.log.Log.setLog();
- * 
- *   Note that in Jetty's Log class, they have a static method to initialize
- *   a logger. There is no way to override this behaviour. Instead, you can 
- *   update the source and add the following line in the run() method in the
- *   AccessController.doPrivileged() routine:
- *   
- *   __props.setProperty("org.eclipse.jetty.util.log.class","javaxt.http.Server.Log");
- * 
- *   Be sure to put is right before __logClass is set.
- *
- ******************************************************************************/
+        private final String _name;
 
+        public Log(){
+            this(null);
+        }
 
-@ManagedObject("JavaXT Logging Implementation")
-public static class Log extends AbstractLogger{
+        public Log(String name){
+            this(name,null);
+        }
 
-    private final String _name;
- 
-    public Log(){
-        this(null);
+        public Log(String name, Properties props){
+            _name = name==null ? "" : name;
+        }
+
+        public String getName(){
+            return _name;
+        }
+
+        public void setPrintLongNames(boolean printLongNames){}
+        public boolean isPrintLongNames(){
+            return false;
+        }
+
+        public void setHideStacks(boolean hideStacks){}
+        public boolean isHideStacks(){
+            return true;
+        }
+
+        public void setSource(boolean source){}
+        public boolean isSource(){
+            return false;
+        }
+
+        public void ignore(Throwable ignored){}
+        public void warn(String msg, Object... args){}
+        public void warn(Throwable thrown){}
+        public void warn(String msg, Throwable thrown){}
+        public void info(String msg, Object... args){}
+        public void info(Throwable thrown){}
+        public void info(String msg, Throwable thrown){}
+        public void debug(String msg, Object... args){}
+        public void debug(String msg, long arg){}
+        public void debug(Throwable thrown){}
+        public void debug(String msg, Throwable thrown){}
+
+        public void setDebugEnabled(boolean enabled){}
+        public boolean isDebugEnabled(){
+            return false;
+        }
+
+        public void setLevel(int level){}
+        public int getLevel(){
+            return 0;
+        }
+
+        public void setStdErrStream(java.io.PrintStream stream){}
+
+        protected void format(StringBuilder buffer, Throwable thrown){}
+        protected void format(StringBuilder buffer, Throwable thrown, String indent){}
+
+        public static int getLoggingLevel(Properties props,String name){
+            return lookupLoggingLevel(props,name);
+        }
+
+        public static Server.Log getLogger(Class<?> clazz){
+            org.eclipse.jetty.util.log.Logger log = Log.getLogger(clazz);
+            if (log instanceof Server.Log) return (Server.Log)log;
+            throw new RuntimeException("Invalid logger for " + clazz);
+        }
+
+        @Override
+        protected Server.Log newLogger(String fullname){
+            return new Server.Log(fullname);
+        }
+
+        @Override
+        public String toString(){
+            return "";
+        }
     }
-
-    public Log(String name){
-        this(name,null);
-    }
-
-    public Log(String name, Properties props){
-        _name = name==null ? "" : name;
-    }
-
-    public String getName(){
-        return _name;
-    }
-
-    public void setPrintLongNames(boolean printLongNames){}
-    public boolean isPrintLongNames(){
-        return false;
-    }
-    
-    public void setHideStacks(boolean hideStacks){}
-    public boolean isHideStacks(){
-        return true;
-    }
-
-    public void setSource(boolean source){}
-    public boolean isSource(){
-        return false;
-    }
-
-    public void ignore(Throwable ignored){}
-    public void warn(String msg, Object... args){}
-    public void warn(Throwable thrown){}
-    public void warn(String msg, Throwable thrown){}
-    public void info(String msg, Object... args){}
-    public void info(Throwable thrown){}
-    public void info(String msg, Throwable thrown){}
-    public void debug(String msg, Object... args){}
-    public void debug(String msg, long arg){}
-    public void debug(Throwable thrown){}
-    public void debug(String msg, Throwable thrown){}
-    
-    public void setDebugEnabled(boolean enabled){}
-    public boolean isDebugEnabled(){
-        return false;
-    }
-
-    public void setLevel(int level){}
-    public int getLevel(){
-        return 0;
-    }
-
-    public void setStdErrStream(java.io.PrintStream stream){}
-
-    protected void format(StringBuilder buffer, Throwable thrown){}
-    protected void format(StringBuilder buffer, Throwable thrown, String indent){}
-
-    public static int getLoggingLevel(Properties props,String name){
-        return lookupLoggingLevel(props,name);
-    }
-    
-    public static Server.Log getLogger(Class<?> clazz){
-        org.eclipse.jetty.util.log.Logger log = Log.getLogger(clazz);
-        if (log instanceof Server.Log) return (Server.Log)log;
-        throw new RuntimeException("Invalid logger for " + clazz);
-    }
-
-    @Override
-    protected Server.Log newLogger(String fullname){
-        return new Server.Log(fullname);
-    }
-
-    @Override
-    public String toString(){
-        return "";
-    }
-}
     
 }

@@ -1,5 +1,5 @@
 How to handle:
-- Chunked encoding
+- Cookies
 - Range requests
 
  
