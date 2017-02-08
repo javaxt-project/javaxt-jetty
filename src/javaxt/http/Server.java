@@ -187,31 +187,21 @@ public class Server extends Thread {
       //Create a new SocketListener for each port/address
         for (InetSocketAddress address : addresses){
             String hostName = address.getHostName();
-            if (hostName.equals("0.0.0.0") || hostName.equals("127.0.0.1")) hostName = "localhost";
             
             HttpConnectionFactory http1 = new HttpConnectionFactory(httpConfig);            
             //HTTP2ServerConnectionFactory http2 = new HTTP2ServerConnectionFactory(httpConfig);
             //HTTP2ServerConnectionFactory http2c = new HTTP2ServerConnectionFactory(httpConfig);
             
-         
             
+          //Create server connector
             ServerConnector http;
-            
             javax.net.ssl.SSLContext sslContext = servlet.getSSLContext();
             if (sslContext!=null){
-                
                 SslContextFactory sslContextFactory = new SslContextFactory();
-                sslContextFactory.setSslContext(sslContext);                
-                
-                
-                MySslConnectionFactory ssl = new MySslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString());
-                //SslConnectionFactory ssl = new SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString());
-
-
+                sslContextFactory.setSslContext(sslContext);                                
+                _SslConnectionFactory ssl = new _SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString());
                 HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
                 http = new ServerConnector(server, ssl, new HttpConnectionFactory(httpsConfig));
-
-
             }      
             else{
                 http = new ServerConnector(server, http1); // new ServerConnector(server, http1, http2, http2c)
@@ -222,37 +212,10 @@ public class Server extends Thread {
             http.setPort(address.getPort());        
             http.setIdleTimeout(30000);
             server.addConnector(http);  
-
-            
             
             System.out.print("Accepting connections on " + hostName + ":" + address.getPort() + "\r\n");
         }
 
-                
-
-
-        
-        /*
-      //HTTPS Configuration
-        javax.net.ssl.SSLContext sslContext = servlet.getSSLContext();
-        if (sslContext!=null){
-            HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
-            
-            SecureRequestCustomizer src = new SecureRequestCustomizer();
-            src.setStsMaxAge(2000);
-            src.setStsIncludeSubDomains(true);            
-            httpsConfig.addCustomizer(src);
-
-            SslContextFactory sslContextFactory = new SslContextFactory();
-            sslContextFactory.setSslContext(sslContext);
-            SslConnectionFactory ssl = new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString());
-            
-            ServerConnector https = new ServerConnector(server, ssl, new HttpConnectionFactory(httpsConfig));
-            https.setPort(443);
-            https.setIdleTimeout(30000);
-            server.addConnector(https);
-        }
-        */
 
         
       //Add servlet
@@ -366,22 +329,22 @@ public class Server extends Thread {
 
 
   //**************************************************************************
-  //** MySslConnectionFactory
+  //** _SslConnectionFactory
   //**************************************************************************
   /** Custom connection factory used to handle SSL and non-SSL requests on the
    *  same port. Credit:
    *  http://stackoverflow.com/a/40076056/777443
    */
-    private class MySslConnectionFactory extends org.eclipse.jetty.server.AbstractConnectionFactory {
+    private class _SslConnectionFactory extends org.eclipse.jetty.server.AbstractConnectionFactory {
 
         private final SslContextFactory _sslContextFactory;
         private final String _nextProtocol;
 
-        public MySslConnectionFactory() { this(HttpVersion.HTTP_1_1.asString()); }
+        public _SslConnectionFactory() { this(HttpVersion.HTTP_1_1.asString()); }
 
-        public MySslConnectionFactory(@Name("next") final String nextProtocol) { this((SslContextFactory)null, nextProtocol); }
+        public _SslConnectionFactory(@Name("next") final String nextProtocol) { this((SslContextFactory)null, nextProtocol); }
 
-        public MySslConnectionFactory(@Name("sslContextFactory") final SslContextFactory factory, @Name("next") final String nextProtocol) {
+        public _SslConnectionFactory(@Name("sslContextFactory") final SslContextFactory factory, @Name("next") final String nextProtocol) {
             super("SSL");
             this._sslContextFactory = factory == null?new SslContextFactory():factory;
             this._nextProtocol = nextProtocol;
@@ -410,7 +373,7 @@ public class Server extends Thread {
                 final byte b = bytes[0];    // TLS first byte is 0x16 , SSLv2 first byte is >= 0x80 , HTTP is guaranteed many bytes of ASCII
                 isSSL = b >= 0x7F || (b < 0x20 && b != '\n' && b != '\r' && b != '\t');    
 
-//              //If this is the first byte, check whether the request is SSL
+//              //The following logic is from JavaXT Server 2.x
 //                if ((b>19 && b<25) || b==-128){
 //                    isSSL = true;
 //                }
