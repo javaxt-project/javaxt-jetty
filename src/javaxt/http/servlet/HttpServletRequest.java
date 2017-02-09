@@ -904,7 +904,7 @@ public class HttpServletRequest {
    *  there is no current session and create is true, returns a new session.
    */
     public HttpSession getSession(boolean create){
-        return new HttpSession(request.getSession(create));
+        return new HttpSession(request.getSession(create), new ServletContext(request.getServletContext()));
     }
 
 

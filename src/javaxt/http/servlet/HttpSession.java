@@ -3,20 +3,22 @@ package javaxt.http.servlet;
 public class HttpSession {
     
     private javax.servlet.http.HttpSession session;
+    private ServletContext context;
     
-    protected HttpSession(javax.servlet.http.HttpSession session){
+    protected HttpSession(javax.servlet.http.HttpSession session, ServletContext context){
         this.session = session;
+        this.context = context;
     }
     
     
-//  //**************************************************************************
-//  //** getServletContext
-//  //**************************************************************************
-//  /** Returns the ServletContext.
-//   */
-//    public ServletContext getServletContext(){
-//        return session.getServletContext();
-//    }
+  //**************************************************************************
+  //** getServletContext
+  //**************************************************************************
+  /** Returns the ServletContext.
+   */
+    public ServletContext getServletContext(){
+        return context;
+    }
 
 
   //**************************************************************************
