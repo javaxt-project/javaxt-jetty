@@ -198,7 +198,16 @@ public class Server extends Thread {
             javax.net.ssl.SSLContext sslContext = servlet.getSSLContext();
             if (sslContext!=null){
                 SslContextFactory sslContextFactory = new SslContextFactory();
-                sslContextFactory.setSslContext(sslContext);                                
+                sslContextFactory.setExcludeCipherSuites( //For TLSv1 and TLSv1.1
+                    "SSL_RSA_WITH_DES_CBC_SHA",
+                    "SSL_DHE_RSA_WITH_DES_CBC_SHA",
+                    "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                    "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                    "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                    "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                    "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"
+                );
+                sslContextFactory.setSslContext(sslContext); 
                 _SslConnectionFactory ssl = new _SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString());
                 HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
                 http = new ServerConnector(server, ssl, new HttpConnectionFactory(httpsConfig));
