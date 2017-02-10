@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadPendingException;
 import java.nio.channels.WritePendingException;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentMap;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLSession;
@@ -27,6 +28,7 @@ import org.eclipse.jetty.util.annotation.ManagedObject;
 import org.eclipse.jetty.util.annotation.Name;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.log.AbstractLogger;
+import org.eclipse.jetty.util.log.Logger;
 
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.EndPoint;
@@ -99,12 +101,7 @@ public class Server extends Thread {
   /** Used to instantiate the Server on multiple ports and/or IP addresses.
    */
     public Server(java.util.List<InetSocketAddress> addresses, int numThreads, HttpServlet servlet){
-        this.addresses.clear();
-        for (InetSocketAddress address : addresses){
-            this.addresses.add(address);
-        }
-        this.numThreads = numThreads;
-        this.servlet = servlet;
+        this(addresses.toArray(new InetSocketAddress[addresses.size()]), numThreads, servlet);
     }
 
 
@@ -164,8 +161,28 @@ public class Server extends Thread {
     public void run() {
 
 
+      //Configure logging
+        Server.Log serverLog = new Server.Log(); 
+        org.eclipse.jetty.util.log.Log.setLog(serverLog);        
+        ConcurrentMap<String, Logger> loggers = org.eclipse.jetty.util.log.Log.getMutableLoggers();
+        synchronized(loggers){
+            java.util.ArrayList<String> keys = new java.util.ArrayList<>();
+            java.util.Iterator<String> it = loggers.keySet().iterator();
+            while (it.hasNext()){
+                String key = it.next();
+                Logger logger = loggers.get(key);
+                if (!(logger instanceof Server.Log)) keys.add(key);
+            }
+            if (!keys.isEmpty()){
+                for (String key : keys){
+                    loggers.put(key, serverLog);
+                }
+                loggers.notifyAll();
+            }
+        }
+        
+        
       //Setup Server
-        org.eclipse.jetty.util.log.Log.setLog(new Server.Log());
         QueuedThreadPool threadPool = new QueuedThreadPool();
         threadPool.setMaxThreads(numThreads);
         org.eclipse.jetty.server.Server server = new org.eclipse.jetty.server.Server(threadPool);
@@ -227,8 +244,9 @@ public class Server extends Thread {
 
 
         
-      //Add servlet
-        server.setHandler(servlet);
+      //Add RequestHandler
+        HttpServlet.RequestHandler requestHandler = servlet.getRequestHandler();
+        server.setHandler(requestHandler);
         
         
         
@@ -241,7 +259,7 @@ public class Server extends Thread {
 
             @Override
             public void lifeCycleStarted(LifeCycle arg0){
-                servlet.init();
+                requestHandler.init(null);
             }
             @Override
             public void lifeCycleStopping(LifeCycle arg0){

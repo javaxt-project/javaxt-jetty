@@ -39,3 +39,6 @@ To circumvent this issue, I added a try/catch block in the org.eclipse.jetty.ser
 
 (3) org.eclipse.jetty.server.RequestLog
     Commented out unused import for org.eclipse.jetty.server.handler.RequestLogHandler;
+    
+(4) org.eclipse.jetty.util.log.Log
+    Made the getMutableLoggers() method public so I can replace/update loggers assigned at startup.
