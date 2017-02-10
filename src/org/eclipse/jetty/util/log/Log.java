@@ -319,7 +319,7 @@ public class Log
         return logger;
     }
 
-    static ConcurrentMap<String, Logger> getMutableLoggers()
+    public static ConcurrentMap<String, Logger> getMutableLoggers()
     {
         return __loggers;
     }
