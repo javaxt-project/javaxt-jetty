@@ -28,17 +28,13 @@ import org.eclipse.jetty.server.session.SessionHandler;
 public abstract class HttpServlet {
 
     private Authenticator authenticator;
-    private KeyStore keystore;
-    private KeyStore truststore;
-    private KeyManagerFactory kmf;
-    private TrustManagerFactory tmf;
+    private javax.net.ssl.KeyManager[] kms;
+    private javax.net.ssl.TrustManager[] tms;
     private String sslProvider;
     private ServletContext servletContext;
     private SessionDataStore sessionStore;
     private RequestHandler handler;
     
-  //This variable are used in the HttpServletRequest class.
-    //protected String servletPath = "";
 
 
   //**************************************************************************
@@ -125,25 +121,21 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** setKeyStore
   //**************************************************************************
-  /** Used to set the KeyStore and initialize the KeyManagerFactory. The
-   *  KeyStore is used to store keys and certificates for SSL.
+  /** Used to specify a KeyStore. The KeyStore is used to store keys and 
+   *  certificates for SSL.
    */
     public void setKeyStore(KeyStore keystore, String passphrase) throws Exception {
-
-      //Update class variable
-        this.keystore = keystore;
-
-      //Initialize the KeyManagerFactory
-        kmf = KeyManagerFactory.getInstance("SunX509");
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
         kmf.init(keystore, passphrase.toCharArray());
+        kms = kmf.getKeyManagers();
     }
 
 
   //**************************************************************************
   //** setKeyStore
   //**************************************************************************
-  /** Used to set the KeyStore and initialize the KeyManagerFactory. The
-   *  KeyStore is used to store keys and certificates for SSL.
+  /** Used to specify a KeyStore. The KeyStore is used to store keys and 
+   *  certificates for SSL.
    */
     public void setKeyStore(java.io.File keyStoreFile, String passphrase) throws Exception {
         char[] pw = passphrase.toCharArray();
@@ -154,12 +146,16 @@ public abstract class HttpServlet {
 
 
   //**************************************************************************
-  //** getKeyStore
+  //** setKeyManager
   //**************************************************************************
-  /** Returns the the KeyStore associated with this Servlet.
+  /** Used to specify a KeyManager. The KeyManager is responsible for managing 
+   *  keys and certificates found in a KeyStore. Typically, you are not 
+   *  required to specify a KeyManager. Instead, a KeyManager is selected when
+   *  you call the setKeyStore method. This method is intended for users who 
+   *  require more fine grained control over the SSLEngine. 
    */
-    public KeyStore getKeyStore(){
-        return keystore;
+    public void setKeyManager(javax.net.ssl.KeyManager keyManager) throws Exception {
+        kms = new javax.net.ssl.KeyManager[]{keyManager};
     }
 
 
@@ -170,13 +166,9 @@ public abstract class HttpServlet {
    *  TrustStore is used to store public keys and certificates for SSL.
    */
     public void setTrustStore(KeyStore truststore) throws Exception {
-
-      //Update class variable
-        this.truststore = truststore;
-
-      //Initialize the TrustManagerFactory
-        tmf = TrustManagerFactory.getInstance("SunX509");
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
         tmf.init(truststore);
+        tms = tmf.getTrustManagers();
     }
 
 
@@ -191,16 +183,6 @@ public abstract class HttpServlet {
         KeyStore truststore = KeyStore.getInstance("JKS");
         truststore.load(new java.io.FileInputStream(trustStoreFile), pw);
         setTrustStore(truststore);
-    }
-
-
-  //**************************************************************************
-  //** getTrustStore
-  //**************************************************************************
-  /** Returns the the TrustStore associated with this Servlet.
-   */
-    public KeyStore getTrustStore(){
-        return truststore;
     }
 
 
@@ -229,12 +211,12 @@ public abstract class HttpServlet {
 
 
   //**************************************************************************
-  //** SSLContext
+  //** getSSLContext
   //**************************************************************************
-  /** Used to instantiate an SSLEngine used to decrypt SSL/TLS messages.
+  /** Used to instantiate an SSLContext which, in turn is used by an SSLEngine 
+   *  decrypt SSL/TLS messages.
    */
-    public SSLContext getSSLContext() {
-
+    public SSLContext getSSLContext() throws ServletException {
         
         /*//Debug use only!
         java.security.Provider provider = new SSLProvider();
@@ -243,23 +225,16 @@ public abstract class HttpServlet {
         */
 
 
-        javax.net.ssl.KeyManager[] km = null;
-        javax.net.ssl.TrustManager[] tm = null;
-
-        if (kmf!=null) km = kmf.getKeyManagers();
-        if (tmf!=null) tm = tmf.getTrustManagers();
-
-
         SSLContext sslContext = null;
         try{
             if (sslProvider==null) sslContext = SSLContext.getInstance("TLS");
             else sslContext = SSLContext.getInstance("TLS", sslProvider);
-            sslContext.init(km, tm, null);
+            sslContext.init(kms, tms, null);
         }
         catch(Exception e){
-            ServletException se = new ServletException("Failed to instantiate SSLEngine.");
+            ServletException se = new ServletException("Failed to initialize SSLContext.");
             se.initCause(e);
-            //throw se;
+            throw se;
         }
         
         return sslContext;

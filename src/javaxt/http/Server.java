@@ -204,42 +204,47 @@ public class Server extends Thread {
       //Create a new SocketListener for each port/address
         for (InetSocketAddress address : addresses){
             String hostName = address.getHostName();
-            
-            HttpConnectionFactory http1 = new HttpConnectionFactory(httpConfig);            
-            //HTTP2ServerConnectionFactory http2 = new HTTP2ServerConnectionFactory(httpConfig);
-            //HTTP2ServerConnectionFactory http2c = new HTTP2ServerConnectionFactory(httpConfig);
-            
-            
-          //Create server connector
-            ServerConnector http;
-            javax.net.ssl.SSLContext sslContext = servlet.getSSLContext();
-            if (sslContext!=null){
-                SslContextFactory sslContextFactory = new SslContextFactory();
-                sslContextFactory.setExcludeCipherSuites( //For TLSv1 and TLSv1.1
-                    "SSL_RSA_WITH_DES_CBC_SHA",
-                    "SSL_DHE_RSA_WITH_DES_CBC_SHA",
-                    "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-                    "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-                    "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                    "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                    "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"
-                );
-                sslContextFactory.setSslContext(sslContext); 
-                _SslConnectionFactory ssl = new _SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString());
-                HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
-                http = new ServerConnector(server, ssl, new HttpConnectionFactory(httpsConfig));
-            }      
-            else{
-                http = new ServerConnector(server, http1); // new ServerConnector(server, http1, http2, http2c)
+            try{
+                
+                HttpConnectionFactory http1 = new HttpConnectionFactory(httpConfig);            
+                //HTTP2ServerConnectionFactory http2 = new HTTP2ServerConnectionFactory(httpConfig);
+                //HTTP2ServerConnectionFactory http2c = new HTTP2ServerConnectionFactory(httpConfig);
+
+
+              //Create server connector
+                ServerConnector http;
+                javax.net.ssl.SSLContext sslContext = servlet.getSSLContext();
+                if (sslContext!=null){
+                    SslContextFactory sslContextFactory = new SslContextFactory();
+                    sslContextFactory.setExcludeCipherSuites( //For TLSv1 and TLSv1.1
+                        "SSL_RSA_WITH_DES_CBC_SHA",
+                        "SSL_DHE_RSA_WITH_DES_CBC_SHA",
+                        "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                        "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                        "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                        "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                        "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"
+                    );
+                    sslContextFactory.setSslContext(sslContext); 
+                    _SslConnectionFactory ssl = new _SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString());
+                    HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
+                    http = new ServerConnector(server, ssl, new HttpConnectionFactory(httpsConfig));
+                }      
+                else{
+                    http = new ServerConnector(server, http1); // new ServerConnector(server, http1, http2, http2c)
+                }
+
+
+                http.setHost(hostName);
+                http.setPort(address.getPort());
+                http.setIdleTimeout(30000);
+                server.addConnector(http);
+
+                System.out.print("Accepting connections on " + hostName + ":" + address.getPort() + "\r\n");
             }
-          
-            
-            http.setHost(hostName);
-            http.setPort(address.getPort());        
-            http.setIdleTimeout(30000);
-            server.addConnector(http);  
-            
-            System.out.print("Accepting connections on " + hostName + ":" + address.getPort() + "\r\n");
+            catch(Exception e){
+                e.printStackTrace();
+            }
         }
 
 

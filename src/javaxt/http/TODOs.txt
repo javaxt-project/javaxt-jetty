@@ -1,7 +1,8 @@
 How to handle:
-- Sessions
+- Session
 - Cookies
 - Range requests
+- DoS Filter
 
  
 Changes to the Jetty source:
@@ -42,3 +43,10 @@ To circumvent this issue, I added a try/catch block in the org.eclipse.jetty.ser
     
 (4) org.eclipse.jetty.util.log.Log
     Made the getMutableLoggers() method public so I can replace/update loggers assigned at startup.
+    
+    
+  
+    
+ Bugs:
+    - HttpServletResponse.sendRedirect will cause the server to hang and log file to fill up. 
+    As a workaround the caller must return immediately after calling sendRedirect.
