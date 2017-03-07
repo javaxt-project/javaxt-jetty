@@ -30,6 +30,7 @@ public abstract class HttpServlet {
     private Authenticator authenticator;
     private javax.net.ssl.KeyManager[] kms;
     private javax.net.ssl.TrustManager[] tms;
+    private SSLContext sslContext;
     private String sslProvider;
     private ServletContext servletContext;
     private SessionDataStore sessionStore;
@@ -149,10 +150,12 @@ public abstract class HttpServlet {
   //** setKeyManager
   //**************************************************************************
   /** Used to specify a KeyManager. The KeyManager is responsible for managing 
-   *  keys and certificates found in a KeyStore. Typically, you are not 
-   *  required to specify a KeyManager. Instead, a KeyManager is selected when
-   *  you call the setKeyStore method. This method is intended for users who 
-   *  require more fine grained control over the SSLEngine. 
+   *  keys and certificates found in a KeyStore and is used to initialize the
+   *  SSLContext. Typically, users are not required to specify a KeyManager. 
+   *  Instead, a KeyManager is selected for you whenever the setKeyStore() 
+   *  method is called. However, in some cases, the default KeyManager is not
+   *  adequate (e.g. managing KeyStores with multiple SSL certificates) and
+   *  users need to specify a different KeyManager. 
    */
     public void setKeyManager(javax.net.ssl.KeyManager keyManager) throws Exception {
         kms = new javax.net.ssl.KeyManager[]{keyManager};
@@ -213,7 +216,7 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** getSSLContext
   //**************************************************************************
-  /** Used to instantiate an SSLContext which, in turn is used by an SSLEngine 
+  /** Used to initialize an SSLContext which, in turn is used by an SSLEngine 
    *  decrypt SSL/TLS messages.
    */
     public SSLContext getSSLContext() throws ServletException {
@@ -225,7 +228,7 @@ public abstract class HttpServlet {
         */
 
 
-        SSLContext sslContext = null;
+        if (sslContext==null)
         try{
             if (sslProvider==null) sslContext = SSLContext.getInstance("TLS");
             else sslContext = SSLContext.getInstance("TLS", sslProvider);
@@ -239,7 +242,19 @@ public abstract class HttpServlet {
         
         return sslContext;
     }
-    
+
+
+  //**************************************************************************
+  //** supportsHttps
+  //**************************************************************************
+    public boolean supportsHttps(){
+        try{
+            return getSSLContext()!=null;
+        }
+        catch(Exception e){
+            return false;
+        }
+    }
     
     
   //**************************************************************************
