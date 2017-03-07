@@ -44,7 +44,7 @@ public abstract class HttpServlet {
   /** Called by the servlet container to indicate to a servlet that it is
    *  being placed into service.
    */
-    public void init(javax.servlet.ServletConfig servletConfig) {
+    public void init(Object servletConfig) {
     }
     
   //**************************************************************************
