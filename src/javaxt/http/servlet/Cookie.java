@@ -15,6 +15,11 @@ public class Cookie {
 
     javax.servlet.http.Cookie cookie;
 
+    
+    public Cookie(String name, String value) {
+        this(new javax.servlet.http.Cookie(name, value));
+    }
+    
     public Cookie(javax.servlet.http.Cookie cookie){
         this.cookie = cookie;
     }
