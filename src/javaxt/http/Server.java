@@ -264,7 +264,12 @@ public class Server extends Thread {
 
             @Override
             public void lifeCycleStarted(LifeCycle arg0){
-                requestHandler.init(null);
+                try{
+                    requestHandler.init(null);
+                }
+                catch(javaxt.http.servlet.ServletException e){
+                    e.printStackTrace();
+                }
             }
             @Override
             public void lifeCycleStopping(LifeCycle arg0){
@@ -292,7 +297,6 @@ public class Server extends Thread {
         }
         catch(Exception e){
             e.printStackTrace();
-            return;
         }
     }
 

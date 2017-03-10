@@ -30,7 +30,6 @@ public abstract class HttpServlet {
     private Authenticator authenticator;
     private javax.net.ssl.KeyManager[] kms;
     private javax.net.ssl.TrustManager[] tms;
-    private SSLContext sslContext;
     private String sslProvider;
     private ServletContext servletContext;
     private SessionDataStore sessionStore;
@@ -44,7 +43,7 @@ public abstract class HttpServlet {
   /** Called by the servlet container to indicate to a servlet that it is
    *  being placed into service.
    */
-    public void init(Object servletConfig) {
+    public void init(Object servletConfig) throws ServletException {
     }
     
   //**************************************************************************
@@ -227,8 +226,7 @@ public abstract class HttpServlet {
         setSSLProvider(provider);
         */
 
-
-        if (sslContext==null)
+        SSLContext sslContext = null;
         try{
             if (sslProvider==null) sslContext = SSLContext.getInstance("TLS");
             else sslContext = SSLContext.getInstance("TLS", sslProvider);
@@ -247,13 +245,15 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** supportsHttps
   //**************************************************************************
+  /** Returns true if the servlet has been configured to support HTTP/SSL. 
+   *  This is determined by checking if a KeyStore or a KeyManager has been 
+   *  assigned.
+   */
     public boolean supportsHttps(){
-        try{
-            return getSSLContext()!=null;
+        if (kms!=null && kms.length>0){
+            if (kms[0]!=null) return true;
         }
-        catch(Exception e){
-            return false;
-        }
+        return false;
     }
     
     
@@ -283,7 +283,7 @@ public abstract class HttpServlet {
             this.servlet = servlet;
         }
         
-        public void init(javax.servlet.ServletConfig ServletConfig){
+        public void init(javax.servlet.ServletConfig ServletConfig) throws ServletException{
             
           //Initialize ServletContext
             ContextHandler.Context context=ContextHandler.getCurrentContext();
@@ -320,7 +320,7 @@ public abstract class HttpServlet {
             catch(Exception e){
                 e.printStackTrace();
             }
-        
+
             
             servlet.init(ServletConfig);
         }
