@@ -57,7 +57,8 @@ public class Server extends Thread {
             new java.util.ArrayList<InetSocketAddress>();
 
     private HttpServlet servlet;
-       
+    private Double tlsVersion = 1.0;
+    
     
   //**************************************************************************
   //** Constructor
@@ -102,6 +103,25 @@ public class Server extends Thread {
    */
     public Server(java.util.List<InetSocketAddress> addresses, int numThreads, HttpServlet servlet){
         this(addresses.toArray(new InetSocketAddress[addresses.size()]), numThreads, servlet);
+    }
+
+
+  //**************************************************************************
+  //** setMinTLSVersion
+  //**************************************************************************
+  /** By default, the server is configured to support TLS 1.0, 1.1, and 1.2. 
+   *  You can disable older ciphers by specifying a minimum TLS version (e.g. 1.2),
+   */
+    public void setMinTLSVersion(Double tlsVersion){
+        if (tlsVersion==null) this.tlsVersion = null;
+        else{
+            if (tlsVersion>=1.0 && tlsVersion<=1.2){
+                this.tlsVersion = tlsVersion;
+            }
+            else {
+                this.tlsVersion = null;
+            }
+        }
     }
 
 
@@ -216,15 +236,38 @@ public class Server extends Thread {
                 javax.net.ssl.SSLContext sslContext = servlet.getSSLContext();
                 if (sslContext!=null){
                     SslContextFactory sslContextFactory = new SslContextFactory();
-                    sslContextFactory.setExcludeCipherSuites( //For TLSv1 and TLSv1.1
-                        "SSL_RSA_WITH_DES_CBC_SHA",
-                        "SSL_DHE_RSA_WITH_DES_CBC_SHA",
-                        "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-                        "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-                        "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                        "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                        "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"
-                    );
+                    
+                    if (tlsVersion!=null){
+                        /*
+                        if (tlsVersion==1.2){
+
+                            sslContextFactory.setIncludeProtocols("TLSv1.2");
+                            sslContextFactory.setIncludeCipherSuites(
+                                "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+                                "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+                                "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256",
+                                "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+                            );
+                        }
+                        */
+                        if (tlsVersion<1.2){
+
+                            //sslContextFactory.setIncludeProtocols("TLSv1","TLSv1.1");
+                            sslContextFactory.setExcludeCipherSuites( //For TLSv1 and TLSv1.1
+                                "SSL_RSA_WITH_DES_CBC_SHA",
+                                "SSL_DHE_RSA_WITH_DES_CBC_SHA",
+                                "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                                "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                                "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                                "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"
+                            );               
+                        }
+                    }
+                    else{
+                        //tlsVersion unspecified, use Jetty defaults...
+                    }
+                    
                     sslContextFactory.setSslContext(sslContext); 
                     _SslConnectionFactory ssl = new _SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString());
                     HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
@@ -393,6 +436,15 @@ public class Server extends Thread {
             super.doStart();
             final SSLEngine engine = this._sslContextFactory.newSSLEngine();
             engine.setUseClientMode(false);
+            
+            
+            /*
+            for (String protocol : engine.getEnabledProtocols()) System.out.println("- " + protocol);
+            for (String protocol : engine.getSupportedProtocols()) System.out.println(protocol);
+            for (String cipher : engine.getEnabledCipherSuites()) System.out.println(cipher);
+            String supportedCiphers[] = engine.getSupportedCipherSuites();            
+            */
+            
             final SSLSession session = engine.getSession();
             if(session.getPacketBufferSize() > this.getInputBufferSize()) this.setInputBufferSize(session.getPacketBufferSize());
         }
