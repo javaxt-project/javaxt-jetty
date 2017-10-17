@@ -23,7 +23,7 @@ public class ServletContext {
   //**************************************************************************
   //** Constructor
   //**************************************************************************
-    protected ServletContext(javax.servlet.ServletContext servletContext) {
+    public ServletContext(javax.servlet.ServletContext servletContext) {
         this.servletContext = servletContext;
     }
     

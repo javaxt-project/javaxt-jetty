@@ -14,16 +14,25 @@ import javax.net.ssl.SSLSession;
 import javaxt.http.servlet.HttpServlet;
 import javaxt.http.servlet.HttpServletRequest;
 import javaxt.http.servlet.HttpServletResponse;
+import javaxt.http.servlet.ServletContext;
+import javaxt.http.servlet.ServletException;
 
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.ConnectionFactory;
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.session.AbstractSessionDataStore;
+import org.eclipse.jetty.server.session.SessionData;
+import org.eclipse.jetty.server.session.SessionDataStore;
+import org.eclipse.jetty.server.session.DefaultSessionCache;
+import org.eclipse.jetty.server.session.SessionHandler;
 
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.eclipse.jetty.util.component.LifeCycle;
 import org.eclipse.jetty.util.annotation.ManagedObject;
 import org.eclipse.jetty.util.annotation.Name;
 import org.eclipse.jetty.util.Callback;
@@ -202,11 +211,14 @@ public class Server extends Thread {
         }
         
         
-      //Setup Server
+      //Configure server
         QueuedThreadPool threadPool = new QueuedThreadPool();
         threadPool.setMaxThreads(numThreads);
         org.eclipse.jetty.server.Server server = new org.eclipse.jetty.server.Server(threadPool);
-        
+        server.setHandler(new RequestHandler(servlet));
+        server.setDumpAfterStart(false);
+        server.setDumpBeforeStop(false);
+        server.setStopAtShutdown(true);
 
         
       //HTTP Configuration
@@ -217,8 +229,6 @@ public class Server extends Thread {
         httpConfig.setSendServerVersion(false);
         httpConfig.setSendDateHeader(false);
 
-        
-        
 
         
       //Create a new SocketListener for each port/address
@@ -291,49 +301,9 @@ public class Server extends Thread {
         }
 
 
-        
-      //Add RequestHandler
-        HttpServlet.RequestHandler requestHandler = servlet.getRequestHandler();
-        server.setHandler(requestHandler);
-        
-        
-        
-      //Add lifecycle listener (used to initalize the servlet)
-        server.addLifeCycleListener(new LifeCycle.Listener()
-        {
-            @Override
-            public void lifeCycleStarting(LifeCycle arg0){
-            }
 
-            @Override
-            public void lifeCycleStarted(LifeCycle arg0){
-                try{
-                    requestHandler.init(null);
-                }
-                catch(javaxt.http.servlet.ServletException e){
-                    e.printStackTrace();
-                }
-            }
-            @Override
-            public void lifeCycleStopping(LifeCycle arg0){
-            } 
-            
-            @Override
-            public void lifeCycleStopped(LifeCycle arg0){
-            }     
-            
-            @Override
-            public void lifeCycleFailure(LifeCycle arg0, Throwable t){
-            }  
-        });
-        
 
-      //Extra options
-        server.setDumpAfterStart(false);
-        server.setDumpBeforeStop(false);
-        server.setStopAtShutdown(true);
-        
-        
+      //Start the server
         try{
             server.start();
             server.join();
@@ -406,6 +376,147 @@ public class Server extends Thread {
     }
 
 
+    
+  //**************************************************************************
+  //** RequestHandler
+  //**************************************************************************
+  /** Custom implementation of an AbstractHandler
+   */
+    private static class RequestHandler extends AbstractHandler {
+        
+        private final HttpServlet servlet;
+        private SessionHandler sessionHandler;
+        private SessionDataStore sessionStore;
+        
+        private RequestHandler(HttpServlet servlet){
+            this(servlet, null);
+        }
+        
+        private RequestHandler(HttpServlet servlet, SessionDataStore sessionStore){
+            this.servlet = servlet;
+            this.sessionStore = sessionStore;
+        }
+        
+        
+        @Override
+        public void doStart() throws Exception {
+
+          //Initialize preprocessors
+            for (javaxt.http.servlet.HttpPreprocessor preprocessor : servlet.getPreprocessors()){
+                preprocessor.init(this);
+            }
+            
+          //Initialize servlet
+            init();
+
+            
+          //Call parent
+            super.doStart();
+        }        
+        
+        private void init() throws javaxt.http.servlet.ServletException{
+            
+          //Initialize ServletContext
+            ContextHandler.Context context=ContextHandler.getCurrentContext();
+            javax.servlet.ServletContext servletContext=context==null?new ContextHandler.StaticContext():context;                
+            servlet.setServletContext(new ServletContext(servletContext));
+
+
+          //Get server info. The server info is found in the jar file so do this  
+          //now instead of at run-time with the first http request...
+            String jettyVersion = servletContext.getServerInfo();
+            String javaxtVersion = servlet.getServletContext().getServerInfo();
+            if (1<0) System.out.println(javaxtVersion + " (" + jettyVersion + ")"); 
+
+        
+          //Start the session handler
+            sessionHandler = new SessionHandler();
+            DefaultSessionCache sessionCache = new DefaultSessionCache(sessionHandler);
+            if (sessionStore==null) sessionStore = new SessionStore();
+            sessionCache.setSessionDataStore(sessionStore);
+            sessionHandler.setSessionCache(sessionCache);  
+            try{
+                org.eclipse.jetty.server.Server server = this.getServer();
+                sessionHandler.setServer(server);
+                sessionHandler.start();
+
+                /*
+                _sessionIdManager=new DefaultSessionIdManager(server);
+                server.setSessionIdManager(_sessionIdManager);
+                server.manage(_sessionIdManager);
+                _sessionIdManager.start();            
+                */
+
+            }
+            catch(Exception e){
+                e.printStackTrace();
+            }
+
+            
+            javax.servlet.ServletConfig ServletConfig = null;
+            servlet.init(ServletConfig);
+        }
+        
+        @Override
+        public void handle(
+            String target, Request baseRequest, 
+            javax.servlet.http.HttpServletRequest request, 
+            javax.servlet.http.HttpServletResponse response) 
+            throws IOException, javax.servlet.ServletException {
+
+            
+            for (javaxt.http.servlet.HttpPreprocessor preprocessor : servlet.getPreprocessors()){
+                boolean processedRequest = preprocessor.processRequest(request, response);
+                if (processedRequest){
+                    baseRequest.setHandled(true);
+                    return;
+                }
+            }
+            
+            
+          //Set session handler
+            baseRequest.setSessionHandler(sessionHandler);
+
+
+          //Jetty doesn't return the correct scheme for HTTPS so we need to update the baseRequest
+            org.eclipse.jetty.io.EndPoint endPoint = baseRequest.getHttpChannel().getEndPoint();
+            baseRequest.setScheme((endPoint instanceof SslConnection.DecryptedEndPoint)? "https" : "http");
+
+
+          //Instantiate the JavaXT versions of Request and Response objects
+            HttpServletRequest _request = new HttpServletRequest(request, servlet);
+            HttpServletResponse _response = new HttpServletResponse(_request, response);
+
+
+          //Process the request
+            try{
+                servlet.processRequest(_request, _response);
+                baseRequest.setHandled(true);
+            }
+            catch(java.io.IOException e){
+                throw e;
+            }
+            catch(ServletException e){
+                response.setStatus(e.getStatusCode(), e.getMessage());            
+                //response.sendError(e.getStatusCode(), e.getMessage());
+                baseRequest.setHandled(true);
+            }
+            catch(Exception e){
+                throw new javax.servlet.ServletException(e);
+            }
+        }
+        
+        
+        @Override
+        public void doStop(){
+            servlet.destroy();
+        }
+    }
+    
+
+    
+    
+    
 
   //**************************************************************************
   //** _SslConnectionFactory
@@ -613,7 +724,7 @@ public class Server extends Thread {
    *  org.eclipse.jetty.util.log.Log.setLog();
    */
     @ManagedObject("JavaXT Logging Implementation")
-    public static class Log extends AbstractLogger{
+    private static class Log extends AbstractLogger{
 
         private final String _name;
 
@@ -696,4 +807,52 @@ public class Server extends Thread {
         }
     }
     
+    
+  //**************************************************************************
+  //** SessionStore
+  //**************************************************************************
+  /** Implementation of a Jetty SessionStore. This store actually doesn't do
+   *  anything. 
+   */
+    private static class SessionStore extends AbstractSessionDataStore {
+        
+       
+        @Override
+        public SessionData load(String id) throws Exception { 
+            return null;
+        }
+
+        @Override
+        public SessionData newSessionData(String id, long created, long accessed, long lastAccessed, long maxInactiveMs) {
+            return new SessionData(id, _context.getCanonicalContextPath(), _context.getVhost(), created, accessed, lastAccessed, maxInactiveMs);
+        }
+
+        @Override
+        public boolean delete(String id) throws Exception {
+           return true;
+        }
+
+        @Override
+        public void doStore(String id, SessionData data, long lastSaveTime) throws Exception {
+
+        }
+
+        @Override
+        public java.util.Set<String> doGetExpired(java.util.Set<String> candidates){
+           return candidates; //whatever is suggested we accept
+        }
+
+
+        @Override
+        public boolean isPassivating(){
+            return false;
+        }
+
+
+        @Override
+        public boolean exists(String id){
+            return false;
+        }        
+        
+    }
 }
