@@ -20,7 +20,7 @@ public abstract class HttpServlet {
     private javax.net.ssl.TrustManager[] tms;
     private String sslProvider;
     private ServletContext servletContext;
-    private java.util.List<HttpPreprocessor> preprocessors = new java.util.LinkedList<>();
+
 
   //**************************************************************************
   //** init
@@ -77,27 +77,7 @@ public abstract class HttpServlet {
     public void log(String str){
         //TODO: Implement logger
     }
-    
-    
-  //**************************************************************************
-  //** getPreprocessors
-  //**************************************************************************
-    public java.util.List<HttpPreprocessor> getPreprocessors(){
-        return preprocessors;
-    }
 
-
-  //**************************************************************************
-  //** addPreprocessor
-  //**************************************************************************
-  /** Used to add a Preprocessor to the servlet container. 
-   */
-    public void addPreprocessor(HttpPreprocessor preprocessor){
-        synchronized(preprocessors){
-            preprocessors.add(preprocessor);
-            preprocessors.notify();
-        }
-    }
     
     
 //  //**************************************************************************

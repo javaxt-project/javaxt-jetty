@@ -401,24 +401,17 @@ public class Server extends Thread {
         @Override
         public void doStart() throws Exception {
 
-          //Initialize preprocessors
-            for (javaxt.http.servlet.HttpPreprocessor preprocessor : servlet.getPreprocessors()){
-                preprocessor.init(this);
-            }
-            
-          //Initialize servlet
-            init();
-
-            
-          //Call parent
-            super.doStart();
-        }        
-        
-        private void init() throws javaxt.http.servlet.ServletException{
             
           //Initialize ServletContext
             ContextHandler.Context context=ContextHandler.getCurrentContext();
-            javax.servlet.ServletContext servletContext=context==null?new ContextHandler.StaticContext():context;                
+            javax.servlet.ServletContext servletContext=context==null?new ContextHandler.StaticContext():context;
+
+            
+          //Add the RequestHandler to the ServletContext
+            servletContext.setAttribute("org.eclipse.jetty.server.Handler", this);
+
+            
+          //Add ServletContext to the HttpServlet
             servlet.setServletContext(new ServletContext(servletContext));
 
 
@@ -455,6 +448,10 @@ public class Server extends Thread {
             
             javax.servlet.ServletConfig ServletConfig = null;
             servlet.init(ServletConfig);
+            
+            
+          //Call parent
+            super.doStart();
         }
         
         @Override
@@ -464,15 +461,9 @@ public class Server extends Thread {
             javax.servlet.http.HttpServletResponse response) 
             throws IOException, javax.servlet.ServletException {
 
-            
-            for (javaxt.http.servlet.HttpPreprocessor preprocessor : servlet.getPreprocessors()){
-                boolean processedRequest = preprocessor.processRequest(request, response);
-                if (processedRequest){
-                    baseRequest.setHandled(true);
-                    return;
-                }
-            }
-            
+          //Add reference to the baseRequest to the HttpServletRequest
+            request.setAttribute("org.eclipse.jetty.server.Request", baseRequest);
+
             
           //Set session handler
             baseRequest.setSessionHandler(sessionHandler);
@@ -480,7 +471,14 @@ public class Server extends Thread {
 
           //Jetty doesn't return the correct scheme for HTTPS so we need to update the baseRequest
             org.eclipse.jetty.io.EndPoint endPoint = baseRequest.getHttpChannel().getEndPoint();
-            baseRequest.setScheme((endPoint instanceof SslConnection.DecryptedEndPoint)? "https" : "http");
+            if (endPoint instanceof SslConnection.DecryptedEndPoint){
+                baseRequest.setScheme("https");
+                baseRequest.setSecure(true);
+            }
+            else{
+                baseRequest.setScheme("http");
+                baseRequest.setSecure(false);
+            }
 
 
           //Instantiate the JavaXT versions of Request and Response objects

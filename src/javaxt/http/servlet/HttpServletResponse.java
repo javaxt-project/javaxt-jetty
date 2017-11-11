@@ -48,16 +48,22 @@ public class HttpServletResponse {
         this.response = response;
         
         
-      //Set default response headers
-        //setHeader("Accept-Ranges", "bytes");
-        setHeader("Connection", (request.isKeepAlive() ? "Keep-Alive" : "Close"));
-        setHeader("Server", request.getServletContext().getServerInfo());
-        setHeader("Date", getDate(Calendar.getInstance()));
-        setStatus(200, "OK");
+      //Set default response headers for standard HTTP/S requests. WebSockets and
+      //other upgrade requests should be handled differently.
+        if (request.getHeader("Upgrade")==null){
+            //if (request.getHeader("Upgrade")
+            //setHeader("Accept-Ranges", "bytes");
+            setHeader("Connection", (request.isKeepAlive() ? "Keep-Alive" : "Close"));
+            setHeader("Server", request.getServletContext().getServerInfo());
+            setHeader("Date", getDate(Calendar.getInstance()));
+            setStatus(200, "OK");
+        }
     }
     
     
-
+    protected javax.servlet.http.HttpServletResponse getBaseResponse(){
+        return response;
+    }
 
   //**************************************************************************
   //** addCookie

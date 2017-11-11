@@ -67,6 +67,10 @@ public class HttpServletRequest {
         
     }
     
+    protected javax.servlet.http.HttpServletRequest getBaseRequest(){
+        return request;
+    }
+    
 
   //**************************************************************************
   //** getRemoteAddr
