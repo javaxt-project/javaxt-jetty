@@ -25,7 +25,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.util.Map;
 
 import org.eclipse.jetty.http.MimeTypes.Type;
-import org.eclipse.jetty.util.resource.Resource;
+//import org.eclipse.jetty.util.resource.Resource;
 
 /* ------------------------------------------------------------ */
 /** HttpContent interface.
@@ -59,7 +59,7 @@ public interface HttpContent
     
     ByteBuffer getIndirectBuffer();
     ByteBuffer getDirectBuffer();
-    Resource getResource();
+//    Resource getResource();
     InputStream getInputStream() throws IOException;
     ReadableByteChannel getReadableByteChannel() throws IOException;
     void release();

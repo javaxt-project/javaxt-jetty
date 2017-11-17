@@ -54,13 +54,13 @@ import javax.servlet.ServletContextAttributeListener;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
+//import javax.servlet.ServletRegistration;
 import javax.servlet.ServletRequestAttributeListener;
 import javax.servlet.ServletRequestEvent;
 import javax.servlet.ServletRequestListener;
 import javax.servlet.SessionCookieConfig;
 import javax.servlet.SessionTrackingMode;
-import javax.servlet.descriptor.JspConfigDescriptor;
+//import javax.servlet.descriptor.JspConfigDescriptor;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -86,7 +86,7 @@ import org.eclipse.jetty.util.component.DumpableCollection;
 import org.eclipse.jetty.util.component.Graceful;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
-import org.eclipse.jetty.util.resource.Resource;
+//import org.eclipse.jetty.util.resource.Resource;
 
 /* ------------------------------------------------------------ */
 /**
@@ -178,7 +178,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
 
     private String _displayName;
 
-    private Resource _baseResource;
+//    private Resource _baseResource;
     private MimeTypes _mimeTypes;
     private Map<String, String> _localeEncodingMap;
     private String[] _welcomeFiles;
@@ -203,7 +203,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     private final List<EventListener> _durableListeners = new CopyOnWriteArrayList<>();
     private Map<String, Object> _managedAttributes;
     private String[] _protectedTargets;
-    private final CopyOnWriteArrayList<AliasCheck> _aliasChecks = new CopyOnWriteArrayList<ContextHandler.AliasCheck>();
+//    private final CopyOnWriteArrayList<AliasCheck> _aliasChecks = new CopyOnWriteArrayList<ContextHandler.AliasCheck>();
 
     public enum Availability { UNAVAILABLE,STARTING,AVAILABLE,SHUTDOWN,};
     private volatile Availability _availability;
@@ -238,12 +238,12 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         _scontext = context==null?new Context():context;
         _attributes = new AttributesMap();
         _initParams = new HashMap<String, String>();
-        addAliasCheck(new ApproveNonExistentDirectoryAliases());
-        if (File.separatorChar=='/')
-            addAliasCheck(new AllowSymLinkAliasChecker());
+//        addAliasCheck(new ApproveNonExistentDirectoryAliases());
+//        if (File.separatorChar=='/')
+//            addAliasCheck(new AllowSymLinkAliasChecker());
 
-        if (contextPath!=null)
-            setContextPath(contextPath);
+//        if (contextPath!=null)
+//            setContextPath(contextPath);
         if (parent instanceof HandlerWrapper)
             ((HandlerWrapper)parent).setHandler(this);
         else if (parent instanceof HandlerCollection)
@@ -467,42 +467,42 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         return _classLoader;
     }
 
-    /* ------------------------------------------------------------ */
-    /**
-     * Make best effort to extract a file classpath from the context classloader
-     *
-     * @return Returns the classLoader.
-     */
-    @ManagedAttribute("The file classpath")
-    public String getClassPath()
-    {
-        if (_classLoader == null || !(_classLoader instanceof URLClassLoader))
-            return null;
-        URLClassLoader loader = (URLClassLoader)_classLoader;
-        URL[] urls = loader.getURLs();
-        StringBuilder classpath = new StringBuilder();
-        for (int i = 0; i < urls.length; i++)
-        {
-            try
-            {
-                Resource resource = newResource(urls[i]);
-                File file = resource.getFile();
-                if (file != null && file.exists())
-                {
-                    if (classpath.length() > 0)
-                        classpath.append(File.pathSeparatorChar);
-                    classpath.append(file.getAbsolutePath());
-                }
-            }
-            catch (IOException e)
-            {
-                LOG.debug(e);
-            }
-        }
-        if (classpath.length() == 0)
-            return null;
-        return classpath.toString();
-    }
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * Make best effort to extract a file classpath from the context classloader
+//     *
+//     * @return Returns the classLoader.
+//     */
+//    @ManagedAttribute("The file classpath")
+//    public String getClassPath()
+//    {
+//        if (_classLoader == null || !(_classLoader instanceof URLClassLoader))
+//            return null;
+//        URLClassLoader loader = (URLClassLoader)_classLoader;
+//        URL[] urls = loader.getURLs();
+//        StringBuilder classpath = new StringBuilder();
+//        for (int i = 0; i < urls.length; i++)
+//        {
+//            try
+//            {
+//                Resource resource = newResource(urls[i]);
+//                File file = resource.getFile();
+//                if (file != null && file.exists())
+//                {
+//                    if (classpath.length() > 0)
+//                        classpath.append(File.pathSeparatorChar);
+//                    classpath.append(file.getAbsolutePath());
+//                }
+//            }
+//            catch (IOException e)
+//            {
+//                LOG.debug(e);
+//            }
+//        }
+//        if (classpath.length() == 0)
+//            return null;
+//        return classpath.toString();
+//    }
 
     /* ------------------------------------------------------------ */
     /**
@@ -1452,43 +1452,43 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         _classLoader = classLoader;
     }
 
-    /* ------------------------------------------------------------ */
-    /**
-     * @param contextPath
-     *            The _contextPath to set.
-     */
-    public void setContextPath(String contextPath)
-    {
-        if (contextPath == null)
-            throw new IllegalArgumentException("null contextPath");
-
-        if (contextPath.endsWith("/*"))
-        {
-            LOG.warn(this+" contextPath ends with /*");
-            contextPath=contextPath.substring(0,contextPath.length()-2);
-        }
-        else if (contextPath.length()>1 && contextPath.endsWith("/"))
-        {
-            LOG.warn(this+" contextPath ends with /");
-            contextPath=contextPath.substring(0,contextPath.length()-1);
-        }
-
-        if (contextPath.length()==0)
-        {
-            LOG.warn("Empty contextPath");
-            contextPath="/";
-        }
-
-        _contextPath = contextPath;
-        _contextPathEncoded = URIUtil.encodePath(contextPath);
-
-        if (getServer() != null && (getServer().isStarting() || getServer().isStarted()))
-        {
-            Handler[] contextCollections = getServer().getChildHandlersByClass(ContextHandlerCollection.class);
-            for (int h = 0; contextCollections != null && h < contextCollections.length; h++)
-                ((ContextHandlerCollection)contextCollections[h]).mapContexts();
-        }
-    }
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * @param contextPath
+//     *            The _contextPath to set.
+//     */
+//    public void setContextPath(String contextPath)
+//    {
+//        if (contextPath == null)
+//            throw new IllegalArgumentException("null contextPath");
+//
+//        if (contextPath.endsWith("/*"))
+//        {
+//            LOG.warn(this+" contextPath ends with /*");
+//            contextPath=contextPath.substring(0,contextPath.length()-2);
+//        }
+//        else if (contextPath.length()>1 && contextPath.endsWith("/"))
+//        {
+//            LOG.warn(this+" contextPath ends with /");
+//            contextPath=contextPath.substring(0,contextPath.length()-1);
+//        }
+//
+//        if (contextPath.length()==0)
+//        {
+//            LOG.warn("Empty contextPath");
+//            contextPath="/";
+//        }
+//
+//        _contextPath = contextPath;
+//        _contextPathEncoded = URIUtil.encodePath(contextPath);
+//
+//        if (getServer() != null && (getServer().isStarting() || getServer().isStarted()))
+//        {
+//            Handler[] contextCollections = getServer().getChildHandlersByClass(ContextHandlerCollection.class);
+//            for (int h = 0; contextCollections != null && h < contextCollections.length; h++)
+//                ((ContextHandlerCollection)contextCollections[h]).mapContexts();
+//        }
+//    }
 
     /* ------------------------------------------------------------ */
     /**
@@ -1500,60 +1500,60 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         _displayName = servletContextName;
     }
 
-    /* ------------------------------------------------------------ */
-    /**
-     * @return Returns the resourceBase.
-     */
-    public Resource getBaseResource()
-    {
-        if (_baseResource == null)
-            return null;
-        return _baseResource;
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * @return Returns the base resource as a string.
-     */
-    @ManagedAttribute("document root for context")
-    public String getResourceBase()
-    {
-        if (_baseResource == null)
-            return null;
-        return _baseResource.toString();
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * Set the base resource for this context.
-     * @param base The resource used as the base for all static content of this context.
-     * @see #setResourceBase(String)
-     */
-    public void setBaseResource(Resource base)
-    {
-        _baseResource = base;
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * Set the base resource for this context.
-     * @param resourceBase A string representing the base resource for the context. Any string accepted
-     * by {@link Resource#newResource(String)} may be passed and the call is equivalent to
-     * <code>setBaseResource(newResource(resourceBase));</code>
-     */
-    public void setResourceBase(String resourceBase)
-    {
-        try
-        {
-            setBaseResource(newResource(resourceBase));
-        }
-        catch (Exception e)
-        {
-            LOG.warn(e.toString());
-            LOG.debug(e);
-            throw new IllegalArgumentException(resourceBase);
-        }
-    }
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * @return Returns the resourceBase.
+//     */
+//    public Resource getBaseResource()
+//    {
+//        if (_baseResource == null)
+//            return null;
+//        return _baseResource;
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * @return Returns the base resource as a string.
+//     */
+//    @ManagedAttribute("document root for context")
+//    public String getResourceBase()
+//    {
+//        if (_baseResource == null)
+//            return null;
+//        return _baseResource.toString();
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * Set the base resource for this context.
+//     * @param base The resource used as the base for all static content of this context.
+//     * @see #setResourceBase(String)
+//     */
+//    public void setBaseResource(Resource base)
+//    {
+//        _baseResource = base;
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * Set the base resource for this context.
+//     * @param resourceBase A string representing the base resource for the context. Any string accepted
+//     * by {@link Resource#newResource(String)} may be passed and the call is equivalent to
+//     * <code>setBaseResource(newResource(resourceBase));</code>
+//     */
+//    public void setResourceBase(String resourceBase)
+//    {
+//        try
+//        {
+//            setBaseResource(newResource(resourceBase));
+//        }
+//        catch (Exception e)
+//        {
+//            LOG.warn(e.toString());
+//            LOG.debug(e);
+//            throw new IllegalArgumentException(resourceBase);
+//        }
+//    }
 
     /* ------------------------------------------------------------ */
     /**
@@ -1689,7 +1689,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             }
         }
         b.append(getClass().getSimpleName()).append('@').append(Integer.toString(hashCode(),16));
-        b.append('{').append(getContextPath()).append(',').append(getBaseResource()).append(',').append(_availability);
+//        b.append('{').append(getContextPath()).append(',').append(getBaseResource()).append(',').append(_availability);
 
         if (vhosts != null && vhosts.length > 0)
             b.append(',').append(vhosts[0]);
@@ -1759,134 +1759,134 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         return Collections.unmodifiableMap(_localeEncodingMap);
     }
 
-    /* ------------------------------------------------------------ */
-    /*
-     */
-    public Resource getResource(String path) throws MalformedURLException
-    {
-        if (path == null || !path.startsWith(URIUtil.SLASH))
-            throw new MalformedURLException(path);
-
-        if (_baseResource == null)
-            return null;
-
-        try
-        {
-            path = URIUtil.canonicalPath(path);
-            Resource resource = _baseResource.addPath(path);
-
-            if (checkAlias(path,resource))
-                return resource;
-            return null;
-        }
-        catch (Exception e)
-        {
-            LOG.ignore(e);
-        }
-
-        return null;
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * @param path the path to check the alias for
-     * @param resource the resource
-     * @return True if the alias is OK
-     */
-    public boolean checkAlias(String path, Resource resource)
-    {
-        // Is the resource aliased?
-        if (resource.isAlias())
-        {
-            if (LOG.isDebugEnabled())
-                LOG.debug("Aliased resource: " + resource + "~=" + resource.getAlias());
-
-            // alias checks
-            for (Iterator<AliasCheck> i=_aliasChecks.iterator();i.hasNext();)
-            {
-                AliasCheck check = i.next();
-                if (check.check(path,resource))
-                {
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("Aliased resource: " + resource + " approved by " + check);
-                    return true;
-                }
-            }
-            return false;
-        }
-        return true;
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * Convert URL to Resource wrapper for {@link Resource#newResource(URL)} enables extensions to provide alternate resource implementations.
-     * @param url the url to convert to a Resource
-     * @return the Resource for that url
-     * @throws IOException if unable to create a Resource from the URL
-     */
-    public Resource newResource(URL url) throws IOException
-    {
-        return Resource.newResource(url);
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * Convert URL to Resource wrapper for {@link Resource#newResource(URL)} enables extensions to provide alternate resource implementations.
-     * @param uri the URI to convert to a Resource
-     * @return the Resource for that URI
-     * @throws IOException if unable to create a Resource from the URL
-     */
-    public Resource newResource(URI uri) throws IOException
-    {
-        return Resource.newResource(uri);
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * Convert a URL or path to a Resource. The default implementation is a wrapper for {@link Resource#newResource(String)}.
-     *
-     * @param urlOrPath
-     *            The URL or path to convert
-     * @return The Resource for the URL/path
-     * @throws IOException
-     *             The Resource could not be created.
-     */
-    public Resource newResource(String urlOrPath) throws IOException
-    {
-        return Resource.newResource(urlOrPath);
-    }
-
-    /* ------------------------------------------------------------ */
-    /*
-     */
-    public Set<String> getResourcePaths(String path)
-    {
-        try
-        {
-            path = URIUtil.canonicalPath(path);
-            Resource resource = getResource(path);
-
-            if (resource != null && resource.exists())
-            {
-                if (!path.endsWith(URIUtil.SLASH))
-                    path = path + URIUtil.SLASH;
-
-                String[] l = resource.list();
-                if (l != null)
-                {
-                    HashSet<String> set = new HashSet<String>();
-                    for (int i = 0; i < l.length; i++)
-                        set.add(path + l[i]);
-                    return set;
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            LOG.ignore(e);
-        }
-        return Collections.emptySet();
-    }
+//    /* ------------------------------------------------------------ */
+//    /*
+//     */
+//    public Resource getResource(String path) throws MalformedURLException
+//    {
+//        if (path == null || !path.startsWith(URIUtil.SLASH))
+//            throw new MalformedURLException(path);
+//
+//        if (_baseResource == null)
+//            return null;
+//
+//        try
+//        {
+//            path = URIUtil.canonicalPath(path);
+//            Resource resource = _baseResource.addPath(path);
+//
+//            if (checkAlias(path,resource))
+//                return resource;
+//            return null;
+//        }
+//        catch (Exception e)
+//        {
+//            LOG.ignore(e);
+//        }
+//
+//        return null;
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * @param path the path to check the alias for
+//     * @param resource the resource
+//     * @return True if the alias is OK
+//     */
+//    public boolean checkAlias(String path, Resource resource)
+//    {
+//        // Is the resource aliased?
+//        if (resource.isAlias())
+//        {
+//            if (LOG.isDebugEnabled())
+//                LOG.debug("Aliased resource: " + resource + "~=" + resource.getAlias());
+//
+//            // alias checks
+//            for (Iterator<AliasCheck> i=_aliasChecks.iterator();i.hasNext();)
+//            {
+//                AliasCheck check = i.next();
+//                if (check.check(path,resource))
+//                {
+//                    if (LOG.isDebugEnabled())
+//                        LOG.debug("Aliased resource: " + resource + " approved by " + check);
+//                    return true;
+//                }
+//            }
+//            return false;
+//        }
+//        return true;
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * Convert URL to Resource wrapper for {@link Resource#newResource(URL)} enables extensions to provide alternate resource implementations.
+//     * @param url the url to convert to a Resource
+//     * @return the Resource for that url
+//     * @throws IOException if unable to create a Resource from the URL
+//     */
+//    public Resource newResource(URL url) throws IOException
+//    {
+//        return Resource.newResource(url);
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * Convert URL to Resource wrapper for {@link Resource#newResource(URL)} enables extensions to provide alternate resource implementations.
+//     * @param uri the URI to convert to a Resource
+//     * @return the Resource for that URI
+//     * @throws IOException if unable to create a Resource from the URL
+//     */
+//    public Resource newResource(URI uri) throws IOException
+//    {
+//        return Resource.newResource(uri);
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * Convert a URL or path to a Resource. The default implementation is a wrapper for {@link Resource#newResource(String)}.
+//     *
+//     * @param urlOrPath
+//     *            The URL or path to convert
+//     * @return The Resource for the URL/path
+//     * @throws IOException
+//     *             The Resource could not be created.
+//     */
+//    public Resource newResource(String urlOrPath) throws IOException
+//    {
+//        return Resource.newResource(urlOrPath);
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /*
+//     */
+//    public Set<String> getResourcePaths(String path)
+//    {
+//        try
+//        {
+//            path = URIUtil.canonicalPath(path);
+//            Resource resource = getResource(path);
+//
+//            if (resource != null && resource.exists())
+//            {
+//                if (!path.endsWith(URIUtil.SLASH))
+//                    path = path + URIUtil.SLASH;
+//
+//                String[] l = resource.list();
+//                if (l != null)
+//                {
+//                    HashSet<String> set = new HashSet<String>();
+//                    for (int i = 0; i < l.length; i++)
+//                        set.add(path + l[i]);
+//                    return set;
+//                }
+//            }
+//        }
+//        catch (Exception e)
+//        {
+//            LOG.ignore(e);
+//        }
+//        return Collections.emptySet();
+//    }
 
     /* ------------------------------------------------------------ */
     private String normalizeHostname(String host)
@@ -1900,44 +1900,44 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         return host;
     }
 
-    /* ------------------------------------------------------------ */
-    /**
-     * Add an AliasCheck instance to possibly permit aliased resources
-     * @param check The alias checker
-     */
-    public void addAliasCheck(AliasCheck check)
-    {
-        _aliasChecks.add(check);
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * @return Mutable list of Alias checks
-     */
-    public List<AliasCheck> getAliasChecks()
-    {
-        return _aliasChecks;
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * @param checks list of AliasCheck instances
-     */
-    public void setAliasChecks(List<AliasCheck> checks)
-    {
-        _aliasChecks.clear();
-        _aliasChecks.addAll(checks);
-    }
-
-    /* ------------------------------------------------------------ */
-    /**
-     * clear the list of AliasChecks
-     */
-    public void clearAliasChecks()
-    {
-        _aliasChecks.clear();
-    }
-
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * Add an AliasCheck instance to possibly permit aliased resources
+//     * @param check The alias checker
+//     */
+//    public void addAliasCheck(AliasCheck check)
+//    {
+//        _aliasChecks.add(check);
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * @return Mutable list of Alias checks
+//     */
+//    public List<AliasCheck> getAliasChecks()
+//    {
+//        return _aliasChecks;
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * @param checks list of AliasCheck instances
+//     */
+//    public void setAliasChecks(List<AliasCheck> checks)
+//    {
+//        _aliasChecks.clear();
+//        _aliasChecks.addAll(checks);
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /**
+//     * clear the list of AliasChecks
+//     */
+//    public void clearAliasChecks()
+//    {
+//        _aliasChecks.clear();
+//    }
+//
 
     /* ------------------------------------------------------------ */
     /**
@@ -2106,27 +2106,27 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         @Override
         public String getRealPath(String path)
         {
-            if (path == null)
-                return null;
-            if (path.length() == 0)
-                path = URIUtil.SLASH;
-            else if (path.charAt(0) != '/')
-                path = URIUtil.SLASH + path;
-
-            try
-            {
-                Resource resource = ContextHandler.this.getResource(path);
-                if (resource != null)
-                {
-                    File file = resource.getFile();
-                    if (file != null)
-                        return file.getCanonicalPath();
-                }
-            }
-            catch (Exception e)
-            {
-                LOG.ignore(e);
-            }
+//            if (path == null)
+//                return null;
+//            if (path.length() == 0)
+//                path = URIUtil.SLASH;
+//            else if (path.charAt(0) != '/')
+//                path = URIUtil.SLASH + path;
+//
+//            try
+//            {
+//                Resource resource = ContextHandler.this.getResource(path);
+//                if (resource != null)
+//                {
+//                    File file = resource.getFile();
+//                    if (file != null)
+//                        return file.getCanonicalPath();
+//                }
+//            }
+//            catch (Exception e)
+//            {
+//                LOG.ignore(e);
+//            }
 
             return null;
         }
@@ -2135,9 +2135,9 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         @Override
         public URL getResource(String path) throws MalformedURLException
         {
-            Resource resource = ContextHandler.this.getResource(path);
-            if (resource != null && resource.exists())
-                return resource.getURI().toURL();
+//            Resource resource = ContextHandler.this.getResource(path);
+//            if (resource != null && resource.exists())
+//                return resource.getURI().toURL();
             return null;
         }
 
@@ -2148,22 +2148,22 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         @Override
         public InputStream getResourceAsStream(String path)
         {
-            try
-            {
-                URL url = getResource(path);
-                if (url == null)
-                    return null;
-                Resource r = Resource.newResource(url);
-                // Cannot serve directories as an InputStream
-                if(r.isDirectory())
-                    return null;
-                return r.getInputStream();
-            }
-            catch (Exception e)
-            {
-                LOG.ignore(e);
+//            try
+//            {
+//                URL url = getResource(path);
+//                if (url == null)
+//                    return null;
+//                Resource r = Resource.newResource(url);
+//                // Cannot serve directories as an InputStream
+//                if(r.isDirectory())
+//                    return null;
+//                return r.getInputStream();
+//            }
+//            catch (Exception e)
+//            {
+//                LOG.ignore(e);
                 return null;
-            }
+//            }
         }
 
         /* ------------------------------------------------------------ */
@@ -2173,7 +2173,8 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         @Override
         public Set<String> getResourcePaths(String path)
         {
-            return ContextHandler.this.getResourcePaths(path);
+//            return ContextHandler.this.getResourcePaths(path);
+            return null;
         }
 
         /* ------------------------------------------------------------ */
@@ -2474,17 +2475,17 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             }
         }
 
-        @Override
-        public JspConfigDescriptor getJspConfigDescriptor()
-        {
-            LOG.warn(__unimplmented);
-            return null;
-        }
-
-        public void setJspConfigDescriptor(JspConfigDescriptor d)
-        {
-
-        }
+//        @Override
+//        public JspConfigDescriptor getJspConfigDescriptor()
+//        {
+//            LOG.warn(__unimplmented);
+//            return null;
+//        }
+//
+//        public void setJspConfigDescriptor(JspConfigDescriptor d)
+//        {
+//
+//        }
 
         @Override
         public void declareRoles(String... roleNames)
@@ -2691,26 +2692,26 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             return null;
         }
 
-        @Override
-        public javax.servlet.ServletRegistration.Dynamic addServlet(String servletName, Class<? extends Servlet> servletClass)
-        {
-            LOG.warn(__unimplmented);
-            return null;
-        }
-
-        @Override
-        public javax.servlet.ServletRegistration.Dynamic addServlet(String servletName, Servlet servlet)
-        {
-            LOG.warn(__unimplmented);
-            return null;
-        }
-
-        @Override
-        public javax.servlet.ServletRegistration.Dynamic addServlet(String servletName, String className)
-        {
-            LOG.warn(__unimplmented);
-            return null;
-        }
+//        @Override
+//        public javax.servlet.ServletRegistration.Dynamic addServlet(String servletName, Class<? extends Servlet> servletClass)
+//        {
+//            LOG.warn(__unimplmented);
+//            return null;
+//        }
+//
+//        @Override
+//        public javax.servlet.ServletRegistration.Dynamic addServlet(String servletName, Servlet servlet)
+//        {
+//            LOG.warn(__unimplmented);
+//            return null;
+//        }
+//
+//        @Override
+//        public javax.servlet.ServletRegistration.Dynamic addServlet(String servletName, String className)
+//        {
+//            LOG.warn(__unimplmented);
+//            return null;
+//        }
 
         @Override
         public <T extends Filter> T createFilter(Class<T> c) throws ServletException
@@ -2754,19 +2755,19 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             return null;
         }
 
-        @Override
-        public ServletRegistration getServletRegistration(String servletName)
-        {
-            LOG.warn(__unimplmented);
-            return null;
-        }
-
-        @Override
-        public Map<String, ? extends ServletRegistration> getServletRegistrations()
-        {
-            LOG.warn(__unimplmented);
-            return null;
-        }
+//        @Override
+//        public ServletRegistration getServletRegistration(String servletName)
+//        {
+//            LOG.warn(__unimplmented);
+//            return null;
+//        }
+//
+//        @Override
+//        public Map<String, ? extends ServletRegistration> getServletRegistrations()
+//        {
+//            LOG.warn(__unimplmented);
+//            return null;
+//        }
 
         @Override
         public SessionCookieConfig getSessionCookieConfig()
@@ -2844,12 +2845,12 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             _effectiveMinorVersion = v;
         }
 
-        @Override
-        public JspConfigDescriptor getJspConfigDescriptor()
-        {
-            LOG.warn(__unimplmented);
-            return null;
-        }
+//        @Override
+//        public JspConfigDescriptor getJspConfigDescriptor()
+//        {
+//            LOG.warn(__unimplmented);
+//            return null;
+//        }
 
         @Override
         public void declareRoles(String... roleNames)
@@ -2865,57 +2866,57 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     }
 
 
-    /* ------------------------------------------------------------ */
-    /** Interface to check aliases
-     */
-    public interface AliasCheck
-    {
-        /* ------------------------------------------------------------ */
-        /** Check an alias
-         * @param path The path the aliased resource was created for
-         * @param resource The aliased resourced
-         * @return True if the resource is OK to be served.
-         */
-        boolean check(String path, Resource resource);
-    }
-
-
-    /* ------------------------------------------------------------ */
-    /** Approve all aliases.
-     */
-    public static class ApproveAliases implements AliasCheck
-    {
-        @Override
-        public boolean check(String path, Resource resource)
-        {
-            return true;
-        }
-    }
-
-    /* ------------------------------------------------------------ */
-    /** Approve Aliases of a non existent directory.
-     * If a directory "/foobar/" does not exist, then the resource is
-     * aliased to "/foobar".  Accept such aliases.
-     */
-    public static class ApproveNonExistentDirectoryAliases implements AliasCheck
-    {
-        @Override
-        public boolean check(String path, Resource resource)
-        {
-            if (resource.exists())
-                return false;
-
-            String a=resource.getAlias().toString();
-            String r=resource.getURI().toString();
-
-            if (a.length()>r.length())
-                return a.startsWith(r) && a.length()==r.length()+1 && a.endsWith("/");
-            if (a.length()<r.length())
-                return r.startsWith(a) && r.length()==a.length()+1 && r.endsWith("/");
-
-            return a.equals(r);
-        }
-    }
+//    /* ------------------------------------------------------------ */
+//    /** Interface to check aliases
+//     */
+//    public interface AliasCheck
+//    {
+//        /* ------------------------------------------------------------ */
+//        /** Check an alias
+//         * @param path The path the aliased resource was created for
+//         * @param resource The aliased resourced
+//         * @return True if the resource is OK to be served.
+//         */
+//        boolean check(String path, Resource resource);
+//    }
+//
+//
+//    /* ------------------------------------------------------------ */
+//    /** Approve all aliases.
+//     */
+//    public static class ApproveAliases implements AliasCheck
+//    {
+//        @Override
+//        public boolean check(String path, Resource resource)
+//        {
+//            return true;
+//        }
+//    }
+//
+//    /* ------------------------------------------------------------ */
+//    /** Approve Aliases of a non existent directory.
+//     * If a directory "/foobar/" does not exist, then the resource is
+//     * aliased to "/foobar".  Accept such aliases.
+//     */
+//    public static class ApproveNonExistentDirectoryAliases implements AliasCheck
+//    {
+//        @Override
+//        public boolean check(String path, Resource resource)
+//        {
+//            if (resource.exists())
+//                return false;
+//
+//            String a=resource.getAlias().toString();
+//            String r=resource.getURI().toString();
+//
+//            if (a.length()>r.length())
+//                return a.startsWith(r) && a.length()==r.length()+1 && a.endsWith("/");
+//            if (a.length()<r.length())
+//                return r.startsWith(a) && r.length()==a.length()+1 && r.endsWith("/");
+//
+//            return a.equals(r);
+//        }
+//    }
 
 
     /** Listener for all threads entering context scope, including async IO callbacks

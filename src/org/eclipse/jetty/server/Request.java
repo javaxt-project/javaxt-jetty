@@ -19,8 +19,8 @@
 package org.eclipse.jetty.server;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
+//import java.io.ByteArrayOutputStream;
+//import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -28,7 +28,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
+//import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
 import javax.servlet.AsyncContext;
 import javax.servlet.AsyncListener;
 import javax.servlet.DispatcherType;
-import javax.servlet.MultipartConfigElement;
+//import javax.servlet.MultipartConfigElement;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -80,9 +80,9 @@ import org.eclipse.jetty.server.session.Session;
 import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.util.Attributes;
 import org.eclipse.jetty.util.AttributesMap;
-import org.eclipse.jetty.util.IO;
+//import org.eclipse.jetty.util.IO;
 import org.eclipse.jetty.util.MultiMap;
-import org.eclipse.jetty.util.MultiPartInputStreamParser;
+//import org.eclipse.jetty.util.MultiPartInputStreamParser;
 import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.URIUtil;
 import org.eclipse.jetty.util.UrlEncoded;
@@ -128,9 +128,9 @@ import org.eclipse.jetty.util.log.Logger;
  */
 public class Request implements HttpServletRequest
 {
-    public static final String __MULTIPART_CONFIG_ELEMENT = "org.eclipse.jetty.multipartConfig";
-    public static final String __MULTIPART_INPUT_STREAM = "org.eclipse.jetty.multiPartInputStream";
-    public static final String __MULTIPART_CONTEXT = "org.eclipse.jetty.multiPartContext";
+//    public static final String __MULTIPART_CONFIG_ELEMENT = "org.eclipse.jetty.multipartConfig";
+//    public static final String __MULTIPART_INPUT_STREAM = "org.eclipse.jetty.multiPartInputStream";
+//    public static final String __MULTIPART_CONTEXT = "org.eclipse.jetty.multiPartContext";
 
     private static final Logger LOG = Log.getLogger(Request.class);
     private static final Collection<Locale> __defaultLocale = Collections.singleton(Locale.getDefault());
@@ -200,7 +200,7 @@ public class Request implements HttpServletRequest
     private HttpSession _session;
     private SessionHandler _sessionHandler;
     private long _timeStamp;
-    private MultiPartInputStreamParser _multiPartInputStream; //if the request is a multi-part mime
+//    private MultiPartInputStreamParser _multiPartInputStream; //if the request is a multi-part mime
     private AsyncContextState _async;
 
     /* ------------------------------------------------------------ */
@@ -350,18 +350,18 @@ public class Request implements HttpServletRequest
     /* ------------------------------------------------------------ */
     private MultiMap<String> getParameters()
     {
-        if (!_contentParamsExtracted) 
-        {
-            // content parameters need boolean protection as they can only be read
-            // once, but may be reset to null by a reset
-            _contentParamsExtracted = true;
-
-            // Extract content parameters; these cannot be replaced by a forward()
-            // once extracted and may have already been extracted by getParts() or
-            // by a processing happening after a form-based authentication.
-            if (_contentParameters == null)
-                extractContentParameters();
-        }
+//        if (!_contentParamsExtracted) 
+//        {
+//            // content parameters need boolean protection as they can only be read
+//            // once, but may be reset to null by a reset
+//            _contentParamsExtracted = true;
+//
+//            // Extract content parameters; these cannot be replaced by a forward()
+//            // once extracted and may have already been extracted by getParts() or
+//            // by a processing happening after a form-based authentication.
+//            if (_contentParameters == null)
+//                extractContentParameters();
+//        }
         
         // Extract query string parameters; these may be replaced by a forward()
         // and may have already been extracted by mergeQueryParameters().
@@ -414,34 +414,34 @@ public class Request implements HttpServletRequest
         }
     }
 
-    /* ------------------------------------------------------------ */
-    private void extractContentParameters()
-    {
-        String contentType = getContentType();
-        if (contentType == null || contentType.isEmpty())
-            _contentParameters=NO_PARAMS;
-        else
-        {
-            _contentParameters=new MultiMap<>();
-            contentType = HttpFields.valueParameters(contentType, null);
-            int contentLength = getContentLength();
-            if (contentLength != 0)
-            {
-                if (MimeTypes.Type.FORM_ENCODED.is(contentType) && _inputState == __NONE &&
-                    _channel.getHttpConfiguration().isFormEncodedMethod(getMethod()))
-                {
-                    extractFormParameters(_contentParameters);
-                }
-                else if (contentType.startsWith("multipart/form-data") &&
-                        getAttribute(__MULTIPART_CONFIG_ELEMENT) != null &&
-                        _multiPartInputStream == null)
-                {
-                    extractMultipartParameters(_contentParameters);
-                }
-            }
-        }
-
-    }
+//    /* ------------------------------------------------------------ */
+//    private void extractContentParameters()
+//    {
+//        String contentType = getContentType();
+//        if (contentType == null || contentType.isEmpty())
+//            _contentParameters=NO_PARAMS;
+//        else
+//        {
+//            _contentParameters=new MultiMap<>();
+//            contentType = HttpFields.valueParameters(contentType, null);
+//            int contentLength = getContentLength();
+//            if (contentLength != 0)
+//            {
+//                if (MimeTypes.Type.FORM_ENCODED.is(contentType) && _inputState == __NONE &&
+//                    _channel.getHttpConfiguration().isFormEncodedMethod(getMethod()))
+//                {
+//                    extractFormParameters(_contentParameters);
+//                }
+//                else if (contentType.startsWith("multipart/form-data") &&
+//                        getAttribute(__MULTIPART_CONFIG_ELEMENT) != null &&
+//                        _multiPartInputStream == null)
+//                {
+//                    extractMultipartParameters(_contentParameters);
+//                }
+//            }
+//        }
+//
+//    }
 
     /* ------------------------------------------------------------ */
     public void extractFormParameters(MultiMap<String> params)
@@ -509,19 +509,19 @@ public class Request implements HttpServletRequest
         }
     }
 
-    /* ------------------------------------------------------------ */
-    private void extractMultipartParameters(MultiMap<String> result)
-    {
-        try
-        {
-            getParts(result);
-        }
-        catch (IOException | ServletException e)
-        {
-            LOG.warn(e);
-            throw new RuntimeException(e);
-        }
-    }
+//    /* ------------------------------------------------------------ */
+//    private void extractMultipartParameters(MultiMap<String> result)
+//    {
+//        try
+//        {
+//            getParts(result);
+//        }
+//        catch (IOException | ServletException e)
+//        {
+//            LOG.warn(e);
+//            throw new RuntimeException(e);
+//        }
+//    }
 
     /* ------------------------------------------------------------ */
     @Override
@@ -1844,7 +1844,7 @@ public class Request implements HttpServletRequest
         _parameters = null;
         _contentParamsExtracted = false;
         _inputState = __NONE;
-        _multiPartInputStream = null;
+//        _multiPartInputStream = null;
         _remote=null;
         _input.recycle();
     }
@@ -2275,67 +2275,69 @@ public class Request implements HttpServletRequest
     @Override
     public Part getPart(String name) throws IOException, ServletException
     {
-        getParts();
-
-        return _multiPartInputStream.getPart(name);
+        throw new ServletException("HttpServletRequest.getPart() not supported");
+//        getParts();
+//
+//        return _multiPartInputStream.getPart(name);
     }
 
     /* ------------------------------------------------------------ */
     @Override
     public Collection<Part> getParts() throws IOException, ServletException
     {
-        if (getContentType() == null || !getContentType().startsWith("multipart/form-data"))
-            throw new ServletException("Content-Type != multipart/form-data");
-        return getParts(null);
+        throw new ServletException("HttpServletRequest.getParts() not supported");
+//        if (getContentType() == null || !getContentType().startsWith("multipart/form-data"))
+//            throw new ServletException("Content-Type != multipart/form-data");
+//        return getParts(null);
     }
 
-    private Collection<Part> getParts(MultiMap<String> params) throws IOException, ServletException
-    {
-        if (_multiPartInputStream == null)
-            _multiPartInputStream = (MultiPartInputStreamParser)getAttribute(__MULTIPART_INPUT_STREAM);
-
-        if (_multiPartInputStream == null)
-        {
-            MultipartConfigElement config = (MultipartConfigElement)getAttribute(__MULTIPART_CONFIG_ELEMENT);
-
-            if (config == null)
-                throw new IllegalStateException("No multipart config for servlet");
-
-            _multiPartInputStream = new MultiPartInputStreamParser(getInputStream(),
-                                                             getContentType(), config,
-                                                             (_context != null?(File)_context.getAttribute("javax.servlet.context.tempdir"):null));
-
-            setAttribute(__MULTIPART_INPUT_STREAM, _multiPartInputStream);
-            setAttribute(__MULTIPART_CONTEXT, _context);
-            Collection<Part> parts = _multiPartInputStream.getParts(); //causes parsing
-            ByteArrayOutputStream os = null;
-            for (Part p:parts)
-            {
-                MultiPartInputStreamParser.MultiPart mp = (MultiPartInputStreamParser.MultiPart)p;
-                if (mp.getContentDispositionFilename() == null)
-                {
-                    // Servlet Spec 3.0 pg 23, parts without filename must be put into params.
-                    String charset = null;
-                    if (mp.getContentType() != null)
-                        charset = MimeTypes.getCharsetFromContentType(mp.getContentType());
-
-                    try (InputStream is = mp.getInputStream())
-                    {
-                        if (os == null)
-                            os = new ByteArrayOutputStream();
-                        IO.copy(is, os);
-                        String content=new String(os.toByteArray(),charset==null?StandardCharsets.UTF_8:Charset.forName(charset));
-                        if (_contentParameters == null)
-                            _contentParameters = params == null ? new MultiMap<>() : params;
-                        _contentParameters.add(mp.getName(), content);
-                    }
-                    os.reset();
-                }
-            }
-        }
-
-        return _multiPartInputStream.getParts();
-    }
+//    private Collection<Part> getParts(MultiMap<String> params) throws IOException, ServletException
+//    {
+//        if (_multiPartInputStream == null)
+//            _multiPartInputStream = (MultiPartInputStreamParser)getAttribute(__MULTIPART_INPUT_STREAM);
+//
+//        if (_multiPartInputStream == null)
+//        {
+//            MultipartConfigElement config = (MultipartConfigElement)getAttribute(__MULTIPART_CONFIG_ELEMENT);
+//
+//            if (config == null)
+//                throw new IllegalStateException("No multipart config for servlet");
+//
+//            _multiPartInputStream = new MultiPartInputStreamParser(getInputStream(),
+//                                                             getContentType(), config,
+//                                                             (_context != null?(File)_context.getAttribute("javax.servlet.context.tempdir"):null));
+//
+//            setAttribute(__MULTIPART_INPUT_STREAM, _multiPartInputStream);
+//            setAttribute(__MULTIPART_CONTEXT, _context);
+//            Collection<Part> parts = _multiPartInputStream.getParts(); //causes parsing
+//            ByteArrayOutputStream os = null;
+//            for (Part p:parts)
+//            {
+//                MultiPartInputStreamParser.MultiPart mp = (MultiPartInputStreamParser.MultiPart)p;
+//                if (mp.getContentDispositionFilename() == null)
+//                {
+//                    // Servlet Spec 3.0 pg 23, parts without filename must be put into params.
+//                    String charset = null;
+//                    if (mp.getContentType() != null)
+//                        charset = MimeTypes.getCharsetFromContentType(mp.getContentType());
+//
+//                    try (InputStream is = mp.getInputStream())
+//                    {
+//                        if (os == null)
+//                            os = new ByteArrayOutputStream();
+//                        IO.copy(is, os);
+//                        String content=new String(os.toByteArray(),charset==null?StandardCharsets.UTF_8:Charset.forName(charset));
+//                        if (_contentParameters == null)
+//                            _contentParameters = params == null ? new MultiMap<>() : params;
+//                        _contentParameters.add(mp.getName(), content);
+//                    }
+//                    os.reset();
+//                }
+//            }
+//        }
+//
+//        return _multiPartInputStream.getParts();
+//    }
 
     /* ------------------------------------------------------------ */
     @Override

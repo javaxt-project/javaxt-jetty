@@ -67,7 +67,7 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.StandardConstants;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.X509ExtendedKeyManager;
+//import javax.net.ssl.X509ExtendedKeyManager;
 import javax.net.ssl.X509TrustManager;
 
 import org.eclipse.jetty.util.StringUtil;
@@ -76,10 +76,10 @@ import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.component.Dumpable;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
-import org.eclipse.jetty.util.resource.Resource;
-import org.eclipse.jetty.util.security.CertificateUtils;
-import org.eclipse.jetty.util.security.CertificateValidator;
-import org.eclipse.jetty.util.security.Password;
+//import org.eclipse.jetty.util.resource.Resource;
+//import org.eclipse.jetty.util.security.CertificateUtils;
+//import org.eclipse.jetty.util.security.CertificateValidator;
+//import org.eclipse.jetty.util.security.Password;
 
 /**
  * SslContextFactory is used to configure SSL connectors
@@ -132,18 +132,18 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
     private boolean _useCipherSuitesOrder = true;
     private Comparator<String> _cipherComparator;
     private String[] _selectedCipherSuites;
-    private Resource _keyStoreResource;
+//    private Resource _keyStoreResource;
     private String _keyStoreProvider;
     private String _keyStoreType = "JKS";
     private String _certAlias;
-    private Resource _trustStoreResource;
+//    private Resource _trustStoreResource;
     private String _trustStoreProvider;
     private String _trustStoreType = "JKS";
     private boolean _needClientAuth = false;
     private boolean _wantClientAuth = false;
-    private Password _keyStorePassword;
-    private Password _keyManagerPassword;
-    private Password _trustStorePassword;
+//    private Password _keyStorePassword;
+//    private Password _keyManagerPassword;
+//    private Password _trustStorePassword;
     private String _sslProvider;
     private String _sslProtocol = "TLS";
     private String _secureRandomAlgorithm;
@@ -173,38 +173,39 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
      */
     public SslContextFactory()
     {
-        this(false);
+//        this(false);
+        this(false, null);
     }
 
-    /**
-     * Construct an instance of SslContextFactory
-     * Default constructor for use in XmlConfiguration files
-     *
-     * @param trustAll whether to blindly trust all certificates
-     * @see #setTrustAll(boolean)
-     */
-    public SslContextFactory(boolean trustAll)
-    {
-        this(trustAll, null);
-    }
-
-    /**
-     * Construct an instance of SslContextFactory
-     *
-     * @param keyStorePath default keystore location
-     */
-    public SslContextFactory(String keyStorePath)
-    {
-        this(false, keyStorePath);
-    }
+//    /**
+//     * Construct an instance of SslContextFactory
+//     * Default constructor for use in XmlConfiguration files
+//     *
+//     * @param trustAll whether to blindly trust all certificates
+//     * @see #setTrustAll(boolean)
+//     */
+//    public SslContextFactory(boolean trustAll)
+//    {
+//        this(trustAll, null);
+//    }
+//
+//    /**
+//     * Construct an instance of SslContextFactory
+//     *
+//     * @param keyStorePath default keystore location
+//     */
+//    public SslContextFactory(String keyStorePath)
+//    {
+//        this(false, keyStorePath);
+//    }
 
     private SslContextFactory(boolean trustAll, String keyStorePath)
     {
         setTrustAll(trustAll);
         addExcludeProtocols("SSL", "SSLv2", "SSLv2Hello", "SSLv3");
         setExcludeCipherSuites("^.*_(MD5|SHA|SHA1)$");
-        if (keyStorePath != null)
-            setKeyStorePath(keyStorePath);
+//        if (keyStorePath != null)
+//            setKeyStorePath(keyStorePath);
     }
 
     /**
@@ -226,85 +227,85 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
         KeyStore keyStore = _setKeyStore;
         KeyStore trustStore = _setTrustStore;
 
-        if (context == null)
-        {
-            // Is this an empty factory?
-            if (keyStore == null && _keyStoreResource == null && trustStore == null && _trustStoreResource == null)
-            {
-                TrustManager[] trust_managers = null;
-
-                if (isTrustAll())
-                {
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("No keystore or trust store configured.  ACCEPTING UNTRUSTED CERTIFICATES!!!!!");
-                    // Create a trust manager that does not validate certificate chains
-                    trust_managers = TRUST_ALL_CERTS;
-                }
-
-                String algorithm = getSecureRandomAlgorithm();
-                SecureRandom secureRandom = algorithm == null ? null : SecureRandom.getInstance(algorithm);
-                context = _sslProvider == null ? SSLContext.getInstance(_sslProtocol) : SSLContext.getInstance(_sslProtocol, _sslProvider);
-                context.init(null, trust_managers, secureRandom);
-            }
-            else
-            {
-                if (keyStore == null)
-                    keyStore = loadKeyStore(_keyStoreResource);
-                if (trustStore == null)
-                    trustStore = loadTrustStore(_trustStoreResource);
-
-                Collection<? extends CRL> crls = loadCRL(getCrlPath());
-
-                // Look for X.509 certificates to create alias map
-                if (keyStore != null)
-                {
-                    for (String alias : Collections.list(keyStore.aliases()))
-                    {
-                        Certificate certificate = keyStore.getCertificate(alias);
-                        if (certificate != null && "X.509".equals(certificate.getType()))
-                        {
-                            X509Certificate x509C = (X509Certificate)certificate;
-
-                            // Exclude certificates with special uses
-                            if (X509.isCertSign(x509C))
-                            {
-                                if (LOG.isDebugEnabled())
-                                    LOG.debug("Skipping " + x509C);
-                                continue;
-                            }
-                            X509 x509 = new X509(alias, x509C);
-                            _aliasX509.put(alias, x509);
-
-                            if (isValidateCerts())
-                            {
-                                CertificateValidator validator = new CertificateValidator(trustStore, crls);
-                                validator.setMaxCertPathLength(getMaxCertPathLength());
-                                validator.setEnableCRLDP(isEnableCRLDP());
-                                validator.setEnableOCSP(isEnableOCSP());
-                                validator.setOcspResponderURL(getOcspResponderURL());
-                                validator.validate(keyStore, x509C); // TODO what about truststore?
-                            }
-
-                            LOG.info("x509={} for {}", x509, this);
-
-                            for (String h : x509.getHosts())
-                                _certHosts.put(h, x509);
-                            for (String w : x509.getWilds())
-                                _certWilds.put(w, x509);
-                        }
-                    }
-                }
-
-                // Instantiate key and trust managers
-                KeyManager[] keyManagers = getKeyManagers(keyStore);
-                TrustManager[] trustManagers = getTrustManagers(trustStore, crls);
-
-                // Initialize context
-                SecureRandom secureRandom = (_secureRandomAlgorithm == null) ? null : SecureRandom.getInstance(_secureRandomAlgorithm);
-                context = _sslProvider == null ? SSLContext.getInstance(_sslProtocol) : SSLContext.getInstance(_sslProtocol, _sslProvider);
-                context.init(keyManagers, trustManagers, secureRandom);
-            }
-        }
+//        if (context == null)
+//        {
+//            // Is this an empty factory?
+//            if (keyStore == null && _keyStoreResource == null && trustStore == null && _trustStoreResource == null)
+//            {
+//                TrustManager[] trust_managers = null;
+//
+//                if (isTrustAll())
+//                {
+//                    if (LOG.isDebugEnabled())
+//                        LOG.debug("No keystore or trust store configured.  ACCEPTING UNTRUSTED CERTIFICATES!!!!!");
+//                    // Create a trust manager that does not validate certificate chains
+//                    trust_managers = TRUST_ALL_CERTS;
+//                }
+//
+//                String algorithm = getSecureRandomAlgorithm();
+//                SecureRandom secureRandom = algorithm == null ? null : SecureRandom.getInstance(algorithm);
+//                context = _sslProvider == null ? SSLContext.getInstance(_sslProtocol) : SSLContext.getInstance(_sslProtocol, _sslProvider);
+//                context.init(null, trust_managers, secureRandom);
+//            }
+//            else
+//            {
+////                if (keyStore == null)
+////                    keyStore = loadKeyStore(_keyStoreResource);
+////                if (trustStore == null)
+////                    trustStore = loadTrustStore(_trustStoreResource);
+//
+//                Collection<? extends CRL> crls = loadCRL(getCrlPath());
+//
+//                // Look for X.509 certificates to create alias map
+//                if (keyStore != null)
+//                {
+//                    for (String alias : Collections.list(keyStore.aliases()))
+//                    {
+//                        Certificate certificate = keyStore.getCertificate(alias);
+//                        if (certificate != null && "X.509".equals(certificate.getType()))
+//                        {
+//                            X509Certificate x509C = (X509Certificate)certificate;
+//
+//                            // Exclude certificates with special uses
+//                            if (X509.isCertSign(x509C))
+//                            {
+//                                if (LOG.isDebugEnabled())
+//                                    LOG.debug("Skipping " + x509C);
+//                                continue;
+//                            }
+//                            X509 x509 = new X509(alias, x509C);
+//                            _aliasX509.put(alias, x509);
+//
+//                            if (isValidateCerts())
+//                            {
+//                                CertificateValidator validator = new CertificateValidator(trustStore, crls);
+//                                validator.setMaxCertPathLength(getMaxCertPathLength());
+//                                validator.setEnableCRLDP(isEnableCRLDP());
+//                                validator.setEnableOCSP(isEnableOCSP());
+//                                validator.setOcspResponderURL(getOcspResponderURL());
+//                                validator.validate(keyStore, x509C); // TODO what about truststore?
+//                            }
+//
+//                            LOG.info("x509={} for {}", x509, this);
+//
+//                            for (String h : x509.getHosts())
+//                                _certHosts.put(h, x509);
+//                            for (String w : x509.getWilds())
+//                                _certWilds.put(w, x509);
+//                        }
+//                    }
+//                }
+//
+//                // Instantiate key and trust managers
+//                KeyManager[] keyManagers = getKeyManagers(keyStore);
+//                TrustManager[] trustManagers = getTrustManagers(trustStore, crls);
+//
+//                // Initialize context
+//                SecureRandom secureRandom = (_secureRandomAlgorithm == null) ? null : SecureRandom.getInstance(_secureRandomAlgorithm);
+//                context = _sslProvider == null ? SSLContext.getInstance(_sslProtocol) : SSLContext.getInstance(_sslProtocol, _sslProvider);
+//                context.init(keyManagers, trustManagers, secureRandom);
+//            }
+//        }
 
         // Initialize cache
         SSLSessionContext serverContext = context.getServerSessionContext();
@@ -531,28 +532,28 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
         _useCipherSuitesOrder = useCipherSuitesOrder;
     }
 
-    /**
-     * @return The file or URL of the SSL Key store.
-     */
-    public String getKeyStorePath()
-    {
-        return _keyStoreResource.toString();
-    }
-
-    /**
-     * @param keyStorePath The file or URL of the SSL Key store.
-     */
-    public void setKeyStorePath(String keyStorePath)
-    {
-        try
-        {
-            _keyStoreResource = Resource.newResource(keyStorePath);
-        }
-        catch (Exception e)
-        {
-            throw new IllegalArgumentException(e);
-        }
-    }
+//    /**
+//     * @return The file or URL of the SSL Key store.
+//     */
+//    public String getKeyStorePath()
+//    {
+//        return _keyStoreResource.toString();
+//    }
+//
+//    /**
+//     * @param keyStorePath The file or URL of the SSL Key store.
+//     */
+//    public void setKeyStorePath(String keyStorePath)
+//    {
+//        try
+//        {
+//            _keyStoreResource = Resource.newResource(keyStorePath);
+//        }
+//        catch (Exception e)
+//        {
+//            throw new IllegalArgumentException(e);
+//        }
+//    }
 
     /**
      * @return The provider of the key store
@@ -608,20 +609,20 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
         _certAlias = certAlias;
     }
 
-    /**
-     * @param trustStorePath The file name or URL of the trust store location
-     */
-    public void setTrustStorePath(String trustStorePath)
-    {
-        try
-        {
-            _trustStoreResource = Resource.newResource(trustStorePath);
-        }
-        catch (Exception e)
-        {
-            throw new IllegalArgumentException(e);
-        }
-    }
+//    /**
+//     * @param trustStorePath The file name or URL of the trust store location
+//     */
+//    public void setTrustStorePath(String trustStorePath)
+//    {
+//        try
+//        {
+//            _trustStoreResource = Resource.newResource(trustStorePath);
+//        }
+//        catch (Exception e)
+//        {
+//            throw new IllegalArgumentException(e);
+//        }
+//    }
 
     /**
      * @return The provider of the trust store
@@ -723,70 +724,70 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
         _validatePeerCerts = validatePeerCerts;
     }
 
-    /**
-     * @param password The password for the key store.  If null is passed and
-     *                 a keystore is set, then
-     *                 the {@link #getPassword(String)} is used to
-     *                 obtain a password either from the {@value #PASSWORD_PROPERTY}
-     *                 system property or by prompting for manual entry.
-     */
-    public void setKeyStorePassword(String password)
-    {
-        if (password == null)
-        {
-            if (_keyStoreResource != null)
-                _keyStorePassword = getPassword(PASSWORD_PROPERTY);
-            else
-                _keyStorePassword = null;
-        }
-        else
-        {
-            _keyStorePassword = newPassword(password);
-        }
-    }
-
-    /**
-     * @param password The password (if any) for the specific key within the key store.
-     *                 If null is passed and the {@value #KEYPASSWORD_PROPERTY} system property is set,
-     *                 then the {@link #getPassword(String)} is used to
-     *                 obtain a password from the {@value #KEYPASSWORD_PROPERTY} system property.
-     */
-    public void setKeyManagerPassword(String password)
-    {
-        if (password == null)
-        {
-            if (System.getProperty(KEYPASSWORD_PROPERTY) != null)
-                _keyManagerPassword = getPassword(KEYPASSWORD_PROPERTY);
-            else
-                _keyManagerPassword = null;
-        }
-        else
-        {
-            _keyManagerPassword = newPassword(password);
-        }
-    }
-
-    /**
-     * @param password The password for the truststore. If null is passed and a truststore is set
-     *                 that is different from the keystore, then
-     *                 the {@link #getPassword(String)} is used to
-     *                 obtain a password either from the {@value #PASSWORD_PROPERTY}
-     *                 system property or by prompting for manual entry.
-     */
-    public void setTrustStorePassword(String password)
-    {
-        if (password == null)
-        {
-            if (_trustStoreResource != null && !_trustStoreResource.equals(_keyStoreResource))
-                _trustStorePassword = getPassword(PASSWORD_PROPERTY);
-            else
-                _trustStorePassword = null;
-        }
-        else
-        {
-            _trustStorePassword = newPassword(password);
-        }
-    }
+//    /**
+//     * @param password The password for the key store.  If null is passed and
+//     *                 a keystore is set, then
+//     *                 the {@link #getPassword(String)} is used to
+//     *                 obtain a password either from the {@value #PASSWORD_PROPERTY}
+//     *                 system property or by prompting for manual entry.
+//     */
+//    public void setKeyStorePassword(String password)
+//    {
+//        if (password == null)
+//        {
+//            if (_keyStoreResource != null)
+//                _keyStorePassword = getPassword(PASSWORD_PROPERTY);
+//            else
+//                _keyStorePassword = null;
+//        }
+//        else
+//        {
+//            _keyStorePassword = newPassword(password);
+//        }
+//    }
+//
+//    /**
+//     * @param password The password (if any) for the specific key within the key store.
+//     *                 If null is passed and the {@value #KEYPASSWORD_PROPERTY} system property is set,
+//     *                 then the {@link #getPassword(String)} is used to
+//     *                 obtain a password from the {@value #KEYPASSWORD_PROPERTY} system property.
+//     */
+//    public void setKeyManagerPassword(String password)
+//    {
+//        if (password == null)
+//        {
+//            if (System.getProperty(KEYPASSWORD_PROPERTY) != null)
+//                _keyManagerPassword = getPassword(KEYPASSWORD_PROPERTY);
+//            else
+//                _keyManagerPassword = null;
+//        }
+//        else
+//        {
+//            _keyManagerPassword = newPassword(password);
+//        }
+//    }
+//
+//    /**
+//     * @param password The password for the truststore. If null is passed and a truststore is set
+//     *                 that is different from the keystore, then
+//     *                 the {@link #getPassword(String)} is used to
+//     *                 obtain a password either from the {@value #PASSWORD_PROPERTY}
+//     *                 system property or by prompting for manual entry.
+//     */
+//    public void setTrustStorePassword(String password)
+//    {
+//        if (password == null)
+//        {
+//            if (_trustStoreResource != null && !_trustStoreResource.equals(_keyStoreResource))
+//                _trustStorePassword = getPassword(PASSWORD_PROPERTY);
+//            else
+//                _trustStorePassword = null;
+//        }
+//        else
+//        {
+//            _trustStorePassword = newPassword(password);
+//        }
+//    }
 
     /**
      * @return The SSL provider name, which if set is passed to
@@ -985,97 +986,97 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
         _endpointIdentificationAlgorithm = endpointIdentificationAlgorithm;
     }
 
-    /**
-     * Override this method to provide alternate way to load a keystore.
-     *
-     * @param resource the resource to load the keystore from
-     * @return the key store instance
-     * @throws Exception if the keystore cannot be loaded
-     */
-    protected KeyStore loadKeyStore(Resource resource) throws Exception
-    {
-        String storePassword = _keyStorePassword == null ? null : _keyStorePassword.toString();
-        return CertificateUtils.getKeyStore(resource, getKeyStoreType(), getKeyStoreProvider(), storePassword);
-    }
-
-    /**
-     * Override this method to provide alternate way to load a truststore.
-     *
-     * @param resource the resource to load the truststore from
-     * @return the key store instance
-     * @throws Exception if the truststore cannot be loaded
-     */
-    protected KeyStore loadTrustStore(Resource resource) throws Exception
-    {
-        String type = getTrustStoreType();
-        String provider = getTrustStoreProvider();
-        String passwd = _trustStorePassword == null ? null : _trustStorePassword.toString();
-        if (resource == null || resource.equals(_keyStoreResource))
-        {
-            resource = _keyStoreResource;
-            if (type == null)
-                type = _keyStoreType;
-            if (provider == null)
-                provider = _keyStoreProvider;
-            if (passwd == null)
-                passwd = _keyStorePassword == null ? null : _keyStorePassword.toString();
-        }
-        return CertificateUtils.getKeyStore(resource, type, provider, passwd);
-    }
-
-    /**
-     * Loads certificate revocation list (CRL) from a file.
-     * <p>
-     * Required for integrations to be able to override the mechanism used to
-     * load CRL in order to provide their own implementation.
-     *
-     * @param crlPath path of certificate revocation list file
-     * @return Collection of CRL's
-     * @throws Exception if the certificate revocation list cannot be loaded
-     */
-    protected Collection<? extends CRL> loadCRL(String crlPath) throws Exception
-    {
-        return CertificateUtils.loadCRL(crlPath);
-    }
-
-    protected KeyManager[] getKeyManagers(KeyStore keyStore) throws Exception
-    {
-        KeyManager[] managers = null;
-
-        if (keyStore != null)
-        {
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(getKeyManagerFactoryAlgorithm());
-            keyManagerFactory.init(keyStore, _keyManagerPassword == null ? (_keyStorePassword == null ? null : _keyStorePassword.toString().toCharArray()) : _keyManagerPassword.toString().toCharArray());
-            managers = keyManagerFactory.getKeyManagers();
-
-            if (managers != null)
-            {
-                String alias = getCertAlias();
-                if (alias != null)
-                {
-                    for (int idx = 0; idx < managers.length; idx++)
-                    {
-                        if (managers[idx] instanceof X509ExtendedKeyManager)
-                            managers[idx] = new AliasedX509ExtendedKeyManager((X509ExtendedKeyManager)managers[idx], alias);
-                    }
-                }
-
-                if (!_certHosts.isEmpty() || !_certWilds.isEmpty())
-                {
-                    for (int idx = 0; idx < managers.length; idx++)
-                    {
-                        if (managers[idx] instanceof X509ExtendedKeyManager)
-                            managers[idx] = new SniX509ExtendedKeyManager((X509ExtendedKeyManager)managers[idx]);
-                    }
-                }
-            }
-        }
-
-        if (LOG.isDebugEnabled())
-            LOG.debug("managers={} for {}", managers, this);
-
-        return managers;
-    }
+//    /**
+//     * Override this method to provide alternate way to load a keystore.
+//     *
+//     * @param resource the resource to load the keystore from
+//     * @return the key store instance
+//     * @throws Exception if the keystore cannot be loaded
+//     */
+//    protected KeyStore loadKeyStore(Resource resource) throws Exception
+//    {
+//        String storePassword = _keyStorePassword == null ? null : _keyStorePassword.toString();
+//        return CertificateUtils.getKeyStore(resource, getKeyStoreType(), getKeyStoreProvider(), storePassword);
+//    }
+//
+//    /**
+//     * Override this method to provide alternate way to load a truststore.
+//     *
+//     * @param resource the resource to load the truststore from
+//     * @return the key store instance
+//     * @throws Exception if the truststore cannot be loaded
+//     */
+//    protected KeyStore loadTrustStore(Resource resource) throws Exception
+//    {
+//        String type = getTrustStoreType();
+//        String provider = getTrustStoreProvider();
+//        String passwd = _trustStorePassword == null ? null : _trustStorePassword.toString();
+//        if (resource == null || resource.equals(_keyStoreResource))
+//        {
+//            resource = _keyStoreResource;
+//            if (type == null)
+//                type = _keyStoreType;
+//            if (provider == null)
+//                provider = _keyStoreProvider;
+//            if (passwd == null)
+//                passwd = _keyStorePassword == null ? null : _keyStorePassword.toString();
+//        }
+//        return CertificateUtils.getKeyStore(resource, type, provider, passwd);
+//    }
+//
+//    /**
+//     * Loads certificate revocation list (CRL) from a file.
+//     * <p>
+//     * Required for integrations to be able to override the mechanism used to
+//     * load CRL in order to provide their own implementation.
+//     *
+//     * @param crlPath path of certificate revocation list file
+//     * @return Collection of CRL's
+//     * @throws Exception if the certificate revocation list cannot be loaded
+//     */
+//    protected Collection<? extends CRL> loadCRL(String crlPath) throws Exception
+//    {
+//        return CertificateUtils.loadCRL(crlPath);
+//    }
+//
+//    protected KeyManager[] getKeyManagers(KeyStore keyStore) throws Exception
+//    {
+//        KeyManager[] managers = null;
+//
+//        if (keyStore != null)
+//        {
+//            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(getKeyManagerFactoryAlgorithm());
+//            keyManagerFactory.init(keyStore, _keyManagerPassword == null ? (_keyStorePassword == null ? null : _keyStorePassword.toString().toCharArray()) : _keyManagerPassword.toString().toCharArray());
+//            managers = keyManagerFactory.getKeyManagers();
+//
+//            if (managers != null)
+//            {
+//                String alias = getCertAlias();
+//                if (alias != null)
+//                {
+//                    for (int idx = 0; idx < managers.length; idx++)
+//                    {
+//                        if (managers[idx] instanceof X509ExtendedKeyManager)
+//                            managers[idx] = new AliasedX509ExtendedKeyManager((X509ExtendedKeyManager)managers[idx], alias);
+//                    }
+//                }
+//
+//                if (!_certHosts.isEmpty() || !_certWilds.isEmpty())
+//                {
+//                    for (int idx = 0; idx < managers.length; idx++)
+//                    {
+//                        if (managers[idx] instanceof X509ExtendedKeyManager)
+//                            managers[idx] = new SniX509ExtendedKeyManager((X509ExtendedKeyManager)managers[idx]);
+//                    }
+//                }
+//            }
+//        }
+//
+//        if (LOG.isDebugEnabled())
+//            LOG.debug("managers={} for {}", managers, this);
+//
+//        return managers;
+//    }
 
     protected TrustManager[] getTrustManagers(KeyStore trustStore, Collection<? extends CRL> crls) throws Exception
     {
@@ -1344,35 +1345,35 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
         }
     }
 
-    /**
-     * Set the key store resource.
-     *
-     * @param resource the key store resource to set
-     */
-    public void setKeyStoreResource(Resource resource)
-    {
-        _keyStoreResource = resource;
-    }
-
-    public Resource getKeyStoreResource()
-    {
-        return _keyStoreResource;
-    }
-
-    /**
-     * Set the trust store resource.
-     *
-     * @param resource the trust store resource to set
-     */
-    public void setTrustStoreResource(Resource resource)
-    {
-        _trustStoreResource = resource;
-    }
-
-    public Resource getTrustStoreResource()
-    {
-        return _trustStoreResource;
-    }
+//    /**
+//     * Set the key store resource.
+//     *
+//     * @param resource the key store resource to set
+//     */
+//    public void setKeyStoreResource(Resource resource)
+//    {
+//        _keyStoreResource = resource;
+//    }
+//
+//    public Resource getKeyStoreResource()
+//    {
+//        return _keyStoreResource;
+//    }
+//
+//    /**
+//     * Set the trust store resource.
+//     *
+//     * @param resource the trust store resource to set
+//     */
+//    public void setTrustStoreResource(Resource resource)
+//    {
+//        _trustStoreResource = resource;
+//    }
+//
+//    public Resource getTrustStoreResource()
+//    {
+//        return _trustStoreResource;
+//    }
 
     /**
      * @return true if SSL Session caching is enabled
@@ -1444,27 +1445,27 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
         _sslSessionTimeout = sslSessionTimeout;
     }
 
-    /**
-     * Returns the password object for the given realm.
-     *
-     * @param realm the realm
-     * @return the Password object
-     */
-    protected Password getPassword(String realm)
-    {
-        return Password.getPassword(realm, null, null);
-    }
-
-    /**
-     * Creates a new Password object.
-     *
-     * @param password the password string
-     * @return the new Password object
-     */
-    public Password newPassword(String password)
-    {
-        return new Password(password);
-    }
+//    /**
+//     * Returns the password object for the given realm.
+//     *
+//     * @param realm the realm
+//     * @return the Password object
+//     */
+//    protected Password getPassword(String realm)
+//    {
+//        return Password.getPassword(realm, null, null);
+//    }
+//
+//    /**
+//     * Creates a new Password object.
+//     *
+//     * @param password the password string
+//     * @return the new Password object
+//     */
+//    public Password newPassword(String password)
+//    {
+//        return new Password(password);
+//    }
 
     public SSLServerSocket newSslServerSocket(String host, int port, int backlog) throws IOException
     {
@@ -1697,9 +1698,11 @@ public class SslContextFactory extends AbstractLifeCycle implements Dumpable
     {
         return String.format("%s@%x(%s,%s)",
                 getClass().getSimpleName(),
-                hashCode(),
-                _keyStoreResource,
-                _trustStoreResource);
+                hashCode()
+//                ,
+//                _keyStoreResource,
+//                _trustStoreResource
+        );
     }
 
     class Factory

@@ -66,7 +66,7 @@ import java.util.EnumSet;
 import java.util.EventListener;
 import java.util.Map;
 import java.util.Set;
-import javax.servlet.descriptor.JspConfigDescriptor;
+//import javax.servlet.descriptor.JspConfigDescriptor;
 
 /**
  * Defines a set of methods that a servlet uses to communicate with its
@@ -786,8 +786,8 @@ public interface ServletContext {
      *
      * @since Servlet 3.0
      */
-    public ServletRegistration.Dynamic addServlet(
-        String servletName, String className);
+//    public ServletRegistration.Dynamic addServlet(
+//        String servletName, String className);
 
 
     /**
@@ -827,8 +827,8 @@ public interface ServletContext {
      *
      * @since Servlet 3.0
      */
-    public ServletRegistration.Dynamic addServlet(
-        String servletName, Servlet servlet);
+//    public ServletRegistration.Dynamic addServlet(
+//        String servletName, Servlet servlet);
 
 
     /**
@@ -876,8 +876,8 @@ public interface ServletContext {
      *
      * @since Servlet 3.0
      */
-    public ServletRegistration.Dynamic addServlet(String servletName,
-        Class <? extends Servlet> servletClass);
+//    public ServletRegistration.Dynamic addServlet(String servletName,
+//        Class <? extends Servlet> servletClass);
 
 
     /**
@@ -935,7 +935,7 @@ public interface ServletContext {
      *
      * @since Servlet 3.0
      */
-    public ServletRegistration getServletRegistration(String servletName);
+//    public ServletRegistration getServletRegistration(String servletName);
 
 
     /**
@@ -963,7 +963,7 @@ public interface ServletContext {
      *
      * @since Servlet 3.0
      */
-    public Map<String, ? extends ServletRegistration> getServletRegistrations();
+//    public Map<String, ? extends ServletRegistration> getServletRegistrations();
 
 
     /**
@@ -1513,7 +1513,7 @@ public interface ServletContext {
      *
      * @since Servlet 3.0
      */
-    public JspConfigDescriptor getJspConfigDescriptor();
+//    public JspConfigDescriptor getJspConfigDescriptor();
 
 
     /**
