@@ -179,7 +179,7 @@ public class Request implements HttpServletRequest
     private boolean _newContext;
     private boolean _cookiesExtracted = false;
     private boolean _handled = false;
-    private boolean _contentParamsExtracted;
+//    private boolean _contentParamsExtracted;
     private boolean _requestedSessionIdFromCookie = false;
     private Attributes _attributes;
     private Authentication _authentication;
@@ -189,7 +189,7 @@ public class Request implements HttpServletRequest
     private DispatcherType _dispatcherType;
     private int _inputState = __NONE;
     private MultiMap<String> _queryParameters;
-    private MultiMap<String> _contentParameters;
+//    private MultiMap<String> _contentParameters;
     private MultiMap<String> _parameters;
     private String _queryEncoding;
     private BufferedReader _reader;
@@ -367,19 +367,21 @@ public class Request implements HttpServletRequest
         // and may have already been extracted by mergeQueryParameters().
         if (_queryParameters == null)
             extractQueryParameters();
-
-        // Do parameters need to be combined?
-        if (_queryParameters==NO_PARAMS || _queryParameters.size()==0)
-            _parameters=_contentParameters;
-        else if (_contentParameters==NO_PARAMS || _contentParameters.size()==0)
-            _parameters=_queryParameters;
-        else
-        {
-            _parameters = new MultiMap<>();
-            _parameters.addAllValues(_queryParameters);
-            _parameters.addAllValues(_contentParameters);
-        }
         
+        _parameters=_queryParameters;
+
+//        // Do parameters need to be combined?
+//        if (_queryParameters==NO_PARAMS || _queryParameters.size()==0)
+//            _parameters=_contentParameters;
+//        else if (_contentParameters==NO_PARAMS || _contentParameters.size()==0)
+//            _parameters=_queryParameters;
+//        else
+//        {
+//            _parameters = new MultiMap<>();
+//            _parameters.addAllValues(_queryParameters);
+//            _parameters.addAllValues(_contentParameters);
+//        }
+//        
         // protect against calls to recycled requests (which is illegal, but
         // this gives better failures 
         MultiMap<String> parameters=_parameters;
@@ -1040,11 +1042,11 @@ public class Request implements HttpServletRequest
         _queryParameters = queryParameters;
     }
 
-    /* ------------------------------------------------------------ */
-    public void setContentParameters(MultiMap<String> contentParameters)
-    {
-        _contentParameters = contentParameters;
-    }
+//    /* ------------------------------------------------------------ */
+//    public void setContentParameters(MultiMap<String> contentParameters)
+//    {
+//        _contentParameters = contentParameters;
+//    }
 
     /* ------------------------------------------------------------ */
     public void resetParameters()
@@ -1840,9 +1842,9 @@ public class Request implements HttpServletRequest
         _servletPath = null;
         _timeStamp = 0;
         _queryParameters = null;
-        _contentParameters = null;
+//        _contentParameters = null;
         _parameters = null;
-        _contentParamsExtracted = false;
+//        _contentParamsExtracted = false;
         _inputState = __NONE;
 //        _multiPartInputStream = null;
         _remote=null;
