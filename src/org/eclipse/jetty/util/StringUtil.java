@@ -394,19 +394,6 @@ public class StringUtil
      * Note: uses codepoint version of {@link Character#isISOControl(int)} to support Unicode better.
      * </p>
      *
-     * <pre>
-     *   indexOfControlChars(null)      == -1
-     *   indexOfControlChars("")        == -1
-     *   indexOfControlChars("\r\n")    == 0
-     *   indexOfControlChars("\t")      == 0
-     *   indexOfControlChars("   ")     == -1
-     *   indexOfControlChars("a")       == -1
-     *   indexOfControlChars(".")       == -1
-     *   indexOfControlChars(";\n")     == 1
-     *   indexOfControlChars("abc\f")   == 3
-     *   indexOfControlChars("z\010")   == 1
-     *   indexOfControlChars(":\u001c") == 1
-     * </pre>
      *
      * @param str
      *            the string to test.
