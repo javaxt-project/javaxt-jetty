@@ -641,6 +641,28 @@ public class HttpServletResponse {
    */
     public void write(java.io.File file, String contentType, boolean useCache)
         throws IOException {
+        
+        String fileName = null;
+        if (!contentType.startsWith("image") && !contentType.startsWith("text")){
+            fileName = file.getName();
+        }
+        
+        write(file, fileName, contentType, useCache);
+    }
+
+
+  //**************************************************************************
+  //** write
+  //**************************************************************************
+  /** Used to write contents of a file into the response body. Automatically
+   *  compresses the file content if the client supports gzip compression.
+   *  You should only call this method once.
+   *  @param fileName Optional file name used in the "Content-Disposition" header.
+   *  If the fileName is null, the "Content-Disposition" header will not be
+   *  set by this method.
+   */
+    public void write(java.io.File file, String fileName, String contentType, boolean useCache)
+        throws IOException {
 
         if (!file.exists() || file.isDirectory()){
             this.setStatus(404);
@@ -649,7 +671,6 @@ public class HttpServletResponse {
 
         long fileSize = file.length();
         long fileDate = file.lastModified();
-        String filename = file.getName();
 
 
       //Process Cache Directives
@@ -697,8 +718,8 @@ public class HttpServletResponse {
 
       //Set Content Type and Disposition
         setContentType(contentType);
-        if (!contentType.startsWith("image") && !contentType.startsWith("text")){
-            setHeader("Content-Disposition", "attachment;filename=\"" + filename + "\"");
+        if (fileName!=null){
+            setHeader("Content-Disposition", "attachment;filename=\"" + fileName + "\"");
         }
 
 
