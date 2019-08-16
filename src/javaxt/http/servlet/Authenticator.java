@@ -4,8 +4,12 @@ package javaxt.http.servlet;
 //**  Authenticator Interface
 //******************************************************************************
 /**
- *   Implementations of this class are used to parse credentials and  
- *   authenticate client requests. 
+ *   Implementations of this class are used to parse credentials and
+ *   authenticate client requests. Implementations of this class are typically
+ *   instantiated within a servlet constructor and assigned to the servlet via
+ *   the setAuthenticator() method. Once an Authenticator is defined, several
+ *   security-related methods will be available via the HttpServletRequest
+ *   object (e.g. getCredentials(), getUserPrincipal(), authenticate(), etc).
  *
  ******************************************************************************/
 
@@ -38,11 +42,11 @@ public interface Authenticator {
   //** getCredentials
   //**************************************************************************
   /** Returns an array representing the client credentials associated with
-   *  this request. The first element in the array represents the username 
+   *  this request. The first element in the array represents the username
    *  and the second element represents the password. Client credentials may
    *  be found in the "Authorization" request header, in a client certificate,
    *  etc. Implementations of this class must communicate the authentication
-   *  scheme via the getAuthType() method. If the Authenticator fails to parse 
+   *  scheme via the getAuthType() method. If the Authenticator fails to parse
    *  the credentials, this method returns a null.
    */
     public String[] getCredentials();
@@ -60,7 +64,7 @@ public interface Authenticator {
   //**************************************************************************
   //** getUserPrincipal
   //**************************************************************************
-  /** Returns a java.security.Principal object containing the name of a given 
+  /** Returns a java.security.Principal object containing the name of a given
    *  user. If the user has not been authenticated, the method returns a null.
    */
     public java.security.Principal getPrinciple();
@@ -79,9 +83,9 @@ public interface Authenticator {
 
   //**************************************************************************
   //** getAuthType
-  //**************************************************************************    
-  /** Returns the authentication scheme used to authenticate clients (e.g. 
-   *  "BASIC", "DIGEST", "CLIENT_CERT", etc). 
+  //**************************************************************************
+  /** Returns the authentication scheme used to authenticate clients (e.g.
+   *  "BASIC", "DIGEST", "CLIENT_CERT", etc).
    */
     public String getAuthType();
 

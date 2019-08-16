@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentMap;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLSession;
+import javaxt.http.servlet.FormInput;
+import javaxt.http.servlet.FormValue;
 
 import javaxt.http.servlet.HttpServlet;
 import javaxt.http.servlet.HttpServletRequest;
@@ -54,21 +56,26 @@ import org.eclipse.jetty.http.HttpVersion;
 //**  JavaXT Http Server
 //******************************************************************************
 /**
- *   A lightweight, multi-threaded web server based on Jetty 9.4
+ *   A lightweight, multi-threaded web server used to process HTTP requests
+ *   and send responses back to the client.
+ *
+ *   The server requires an implementation of the HttpServlet class. As new
+ *   requests come in, they are passed to the HttpServlet.processRequest()
+ *   method which is used to generate a response.
  *
  ******************************************************************************/
 
 public class Server extends Thread {
-    
-    
-    private static int numThreads;
-    private java.util.ArrayList<InetSocketAddress> addresses =
-            new java.util.ArrayList<InetSocketAddress>();
 
+
+    private static int numThreads;
+    private InetSocketAddress[] addresses;
     private HttpServlet servlet;
+    private static HttpServlet exceptionServlet = new ExceptionServlet();
     private Double tlsVersion = 1.0;
-    
-    
+    public static boolean debug = false;
+
+
   //**************************************************************************
   //** Constructor
   //**************************************************************************
@@ -95,13 +102,10 @@ public class Server extends Thread {
   /** Used to instantiate the Server on multiple ports and/or IP addresses.
    */
     public Server(InetSocketAddress[] addresses, int numThreads, HttpServlet servlet){
-        this.addresses.clear();
-        for (InetSocketAddress address : addresses){
-            this.addresses.add(address);
-        }
+        this.addresses = addresses;
         this.numThreads = numThreads;
         this.servlet = servlet;
-        
+
     }
 
 
@@ -118,7 +122,7 @@ public class Server extends Thread {
   //**************************************************************************
   //** setMinTLSVersion
   //**************************************************************************
-  /** By default, the server is configured to support TLS 1.0, 1.1, and 1.2. 
+  /** By default, the server is configured to support TLS 1.0, 1.1, and 1.2.
    *  You can disable older ciphers by specifying a minimum TLS version (e.g. 1.2),
    */
     public void setMinTLSVersion(Double tlsVersion){
@@ -137,47 +141,104 @@ public class Server extends Thread {
   //**************************************************************************
   //** Main
   //**************************************************************************
-  /** Entry point for the application. Accepts command line arguments to 
+  /** Entry point for the application. Accepts command line arguments to
    *  specify which port to use and the maximum number of concurrent threads.
    *
-   *  @param args the command line arguments
+   *  @param args Command line arguments. Options include:
+   *  <ul>
+   *  <li>-p to specify which port(s) to run on</li>
+   *  <li>-debug to specify whether to output debug messages to the standard
+   *  output stream.
+   *  </li>
+   *  <li>-dir to specify a path to a directory where html, js, css, images are
+   *  found. The server will server content from this directory to web clients.
+   *  </li>
+   *  </ul>
    */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
 
 
-      //Set the port to listen on
-        InetSocketAddress[] addresses;
+      //Set local variables
+        java.io.File dir = null;
+        InetSocketAddress[] addresses = null;
+        java.io.File keystore = null;
+        String keypass = null;
+
+
+      //Parse inputs
         if (args.length>0){
-            try {
-                int port = Integer.parseInt(args[0]);
+
+            if (args.length==1){
+                addresses = getAddresses(args[0]);
+            }
+            else{
+
+                for (int i=0; i<args.length; i++){
+                    String key = args[i];
+                    if (!key.startsWith("-")) continue;
+                    String val = (i<args.length-1) ? args[i+1] : null;
+                    if (val!=null && !val.startsWith("-")){
+                        i++;
+
+                        if (key.startsWith("-p")){
+                            addresses = getAddresses(val);
+                        }
+                        else if (key.startsWith("-debug")){
+                            if (val.equalsIgnoreCase("true")) debug = true;
+                        }
+                        else if (key.startsWith("-dir")){
+                            java.io.File f = new java.io.File(val);
+                            if (f.exists()){
+                                if (f.isFile()) f = f.getParentFile();
+                                dir = f;
+                            }
+                        }
+                        else if (key.startsWith("-keystore")){
+                            keystore = new java.io.File(val);
+                        }
+                        else if (key.startsWith("-keypass")){
+                            keypass = val;
+                        }
+                    }
+                }
+            }
+        }
+
+
+      //If we're still here, and addresses are null, specify default addresses
+      //for the server to use
+        if (addresses==null) addresses = new InetSocketAddress[]{
+            new InetSocketAddress(80),
+            new InetSocketAddress(443)
+        };
+
+
+      //Instantiate the server with the default/test servlet
+        Server webserver = new Server(addresses, 250, new ServletTest(dir, keystore, keypass));
+        webserver.start();
+    }
+
+
+  //**************************************************************************
+  //** getAddresses
+  //**************************************************************************
+  /** Used to parse command line inputs and return a list of socket addresses.
+   */
+    private static InetSocketAddress[] getAddresses(String str) throws IllegalArgumentException {
+        java.util.ArrayList<InetSocketAddress> addresses =
+        new java.util.ArrayList<InetSocketAddress>();
+
+        for (String s : str.split(",")){
+            try{
+                int port = Integer.parseInt(s);
                 if (port < 0 || port > 65535) throw new Exception();
-                addresses = new InetSocketAddress[]{
-                    new InetSocketAddress(port)
-                };
+                addresses.add(new InetSocketAddress(port));
             }
-            catch (Exception e) {
-                System.out.println("Invalid Port: " + args[0]);
-                return;
+            catch(Exception e){
+                throw new IllegalArgumentException();
             }
         }
-        else{
-            addresses = new InetSocketAddress[]{
-                new InetSocketAddress(80),
-                new InetSocketAddress(443)
-            };
-        }
-
-
-      //Instantiate the HttpServer with a sample HttpServlet
-        try {
-            Server webserver = new Server(addresses, 250, new ServletTest());
-            webserver.start();
-        }
-        catch (Exception e) {
-            System.out.println("Server could not start because of an " 
-             + e.getClass());
-            System.out.println(e);
-        }
+        return addresses.toArray(new InetSocketAddress[addresses.size()]);
     }
 
 
@@ -191,8 +252,8 @@ public class Server extends Thread {
 
 
       //Configure logging
-        Server.Log serverLog = new Server.Log(); 
-        org.eclipse.jetty.util.log.Log.setLog(serverLog);        
+        Server.Log serverLog = new Server.Log();
+        org.eclipse.jetty.util.log.Log.setLog(serverLog);
         ConcurrentMap<String, Logger> loggers = org.eclipse.jetty.util.log.Log.getMutableLoggers();
         synchronized(loggers){
             java.util.ArrayList<String> keys = new java.util.ArrayList<>();
@@ -209,8 +270,8 @@ public class Server extends Thread {
                 loggers.notifyAll();
             }
         }
-        
-        
+
+
       //Configure server
         QueuedThreadPool threadPool = new QueuedThreadPool();
         threadPool.setMaxThreads(numThreads);
@@ -220,7 +281,7 @@ public class Server extends Thread {
         server.setDumpBeforeStop(false);
         server.setStopAtShutdown(true);
 
-        
+
       //HTTP Configuration
         HttpConfiguration httpConfig = new HttpConfiguration();
         httpConfig.setBlockingTimeout(30000);
@@ -230,13 +291,13 @@ public class Server extends Thread {
         httpConfig.setSendDateHeader(false);
 
 
-        
+
       //Create a new SocketListener for each port/address
         for (InetSocketAddress address : addresses){
             String hostName = address.getHostName();
             try{
-                
-                HttpConnectionFactory http1 = new HttpConnectionFactory(httpConfig);            
+
+                HttpConnectionFactory http1 = new HttpConnectionFactory(httpConfig);
                 //HTTP2ServerConnectionFactory http2 = new HTTP2ServerConnectionFactory(httpConfig);
                 //HTTP2ServerConnectionFactory http2c = new HTTP2ServerConnectionFactory(httpConfig);
 
@@ -246,7 +307,7 @@ public class Server extends Thread {
                 javax.net.ssl.SSLContext sslContext = servlet.getSSLContext();
                 if (sslContext!=null){
                     SslContextFactory sslContextFactory = new SslContextFactory();
-                    
+
                     if (tlsVersion!=null){
                         /*
                         if (tlsVersion==1.2){
@@ -271,18 +332,18 @@ public class Server extends Thread {
                                 "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
                                 "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
                                 "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA"
-                            );               
+                            );
                         }
                     }
                     else{
                         //tlsVersion unspecified, use Jetty defaults...
                     }
-                    
-                    sslContextFactory.setSslContext(sslContext); 
+
+                    sslContextFactory.setSslContext(sslContext);
                     _SslConnectionFactory ssl = new _SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString());
                     HttpConfiguration httpsConfig = new HttpConfiguration(httpConfig);
                     http = new ServerConnector(server, ssl, new HttpConnectionFactory(httpsConfig));
-                }      
+                }
                 else{
                     http = new ServerConnector(server, http1); // new ServerConnector(server, http1, http2, http2c)
                 }
@@ -313,7 +374,20 @@ public class Server extends Thread {
         }
     }
 
-    
+
+  //**************************************************************************
+  //** ExceptionServlet
+  //**************************************************************************
+  /** Dummy servlet used to send ServletException errors to the client. Only
+   *  used when a servlet request is not available.
+   */
+    private static class ExceptionServlet extends HttpServlet {
+        public void processRequest(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, java.io.IOException {
+        }
+    }
+
+
   //**************************************************************************
   //** ServletTest
   //**************************************************************************
@@ -322,112 +396,270 @@ public class Server extends Thread {
    */
     private static class ServletTest extends javaxt.http.servlet.HttpServlet {
 
-        private boolean debug = false;
-        
-        public ServletTest() throws Exception {
-            setKeyStore(new java.io.File("/temp/keystore.jks"), "password");
-            setTrustStore(new java.io.File("/temp/keystore.jks"), "password");
+        private final java.io.File dir;
+        private final String s = System.getProperty("file.separator");
+
+        public ServletTest(java.io.File dir, java.io.File keystore, String keypass) throws Exception {
+            this.dir = dir;
+
+            if (keystore!=null){
+                try{
+                    setKeyStore(keystore, keypass);
+                    setTrustStore(keystore, keypass);
+                }
+                catch(Exception e){
+                    e.printStackTrace();
+                }
+            }
         }
+
 
         public void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws java.io.IOException {
 
-            if (debug){
-                System.out.println();
-                System.out.println("New Request From: " + request.getRemoteAddr());
-                System.out.println("TimeStamp: " + new java.util.Date());
+          //Print the requested URL
+            log();
+            log("New Request From: " + request.getRemoteAddr());
+            log("TimeStamp: " + new java.util.Date());
+            log(request.getMethod() + ": " + request.getURL().toString());
+            log();
 
-              //Print the requested URL
-                System.out.println(request.getMethod() + ": " + request.getURL().toString());
-                System.out.println();
+
+          //Process websocket requests
+            /*
+            if (request.isWebSocket()){
+
+                new WebSocketListener(request, response){
+                    public void onConnect(){
+                        send("Hello There!");
+                    }
+                    public void onText(String str){
+                        //System.out.println(str);
+                        send("Message recieved at " + new java.util.Date());
+
+                    }
+                    public void onDisconnect(int statusCode, String reason, boolean remote){
+                        //System.out.println("Goodbye...");
+                    }
+                };
+                return;
             }
+            */
 
 
-          //Send response to the client
-            try{
+          //Process form data
+            if (request.getMethod().equals("POST")){
+                boolean fileUploaded = false;
+                StringBuilder str = new StringBuilder();
+                java.util.Iterator<FormInput> it = request.getFormInputs();
+                while (it.hasNext()){
+                    FormInput input = it.next();
+                    String name = input.getName();
+                    FormValue value = input.getValue();
 
-                //String str = new java.util.Date().toString() + "\r\n" + request.toString();
-                //byte[] header = str.getBytes("UTF-8");
-                
-                byte[] header = request.toString().getBytes("UTF-8");
-                byte[] body = request.getBody();
-                byte[] msg = new byte[header.length + body.length];
-
-                System.arraycopy(header,0,msg,0,header.length);
-                System.arraycopy(body,0,msg,header.length,body.length);
-
-                header = null;
-                body = null;
-
+                    str.append(name);
+                    str.append(": ");
+                    if (input.isFile()){
+                        value.toFile(new java.io.File(dir + s + "uploads" + s + input.getFileName()));
+                        str.append(input.getFileName());
+                        str.append("*");
+                        fileUploaded = true;
+                    }
+                    else{
+                        str.append(value);
+                    }
+                    str.append("\r\n");
+                }
+                if (fileUploaded) str.append("\r\n* File uploaded to the uploads directory");
                 response.setContentType("text/plain");
-                response.write(msg);
-
-                msg = null;
-
-            }
-            catch(Exception e){
+                response.write(str.toString());
+                return;
             }
 
-            if (debug){
-                System.out.println(request.toString());
-                System.out.println(response.toString());
+
+          //Send data
+            if (dir!=null){
+
+              //Get requested path
+                String path = request.getURL().getPath();
+                if (path.length()>1 && path.startsWith("/")) path = path.substring(1);
+
+
+              //Construct a physical file path using the url
+                java.io.File file = new java.io.File(dir + s + path);
+                if (file.exists()){
+                    if (file.isDirectory()){
+                        file = new java.io.File(file, "index.html");
+                    }
+                }
+
+
+              //If the file doesn't exist, return an error
+                if (!file.exists()){
+                    response.setStatus(404);
+                }
+                else{ //Dump the file content to the servlet output stream
+                    String ext = null;
+                    int x = file.getName().lastIndexOf(".");
+                    if (x!=-1) ext = file.getName().substring(x+1).toLowerCase();
+                    response.setBufferSize(8096*8);
+                    response.write(file, getContentType(ext), true);
+                }
             }
+            else{
+
+              //Send sample http response to the client
+                try{
+
+                    byte[] header = request.toString().getBytes("UTF-8");
+                    byte[] body = request.getBody();
+                    byte[] msg = new byte[header.length + body.length];
+
+                    System.arraycopy(header,0,msg,0,header.length);
+                    System.arraycopy(body,0,msg,header.length,body.length);
+
+                    header = null;
+                    body = null;
+
+                    response.setContentType("text/plain");
+                    response.write(msg);
+
+                    msg = null;
+
+                }
+                catch(Exception e){
+                }
+            }
+
+
+            log(request.toString());
+            log(response.toString());
         }
+
+
+        private String getContentType(String ext){
+            if (ext!=null) {
+                if (ext.equals("css")) return "text/css";
+                if (ext.equals("htm") || ext.equals("html")) return "text/html";
+                if (ext.equals("js")) return "text/javascript";
+                if (ext.equals("txt")) return "text/plain";
+                if (ext.equals("gif")) return "image/gif";
+                if (ext.equals("jpg")) return "image/jpeg";
+                if (ext.equals("png")) return "image/png";
+                if (ext.equals("ico")) return "image/vnd.microsoft.icon";
+            }
+            return "application/octet-stream";
+        }
+
+        public void log(){
+            log("");
+        }
+        public void log(String msg){
+            Server.log(msg);
+        }
+
     }
 
 
-    
+  //**************************************************************************
+  //** log
+  //**************************************************************************
+  /** Used to log messages to the standard output stream when the server is
+   *  in debug mode.
+   */
+    public static void log(Object obj) {
+        if (!debug) return;
+
+        String md = "[" + getTime() + "] ";
+        String padding = "";
+        for (int i=0; i<md.length(); i++){
+            padding+= " ";
+        }
+        String str;
+        if (obj instanceof String){
+            str = (String) obj;
+            if (str.length()>0){
+                String[] arr = str.split("\n");
+                for (int i=0; i<arr.length; i++){
+                    if (i==0) str = md + arr[i].trim() + "\r\n";
+                    else str += padding + arr[i].trim() + "\r\n";
+                }
+                str = str.trim();
+            }
+        }
+        else if (obj instanceof Exception){
+            str = md + obj;
+            ((Exception) obj).printStackTrace();
+        }
+        else {
+            str = md + obj;
+        }
+        synchronized(System.out) { System.out.println(str); }
+    }
+
+
+    private static String getTime(){
+        java.util.Date d = new java.util.Date();
+        return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    }
+
+    private static String pad(int i){
+        if (i<10) return "0"+i;
+        else return i+"";
+    }
+
+
   //**************************************************************************
   //** RequestHandler
   //**************************************************************************
   /** Custom implementation of an AbstractHandler
    */
     private static class RequestHandler extends AbstractHandler {
-        
+
         private final HttpServlet servlet;
         private SessionHandler sessionHandler;
         private SessionDataStore sessionStore;
-        
+
         private RequestHandler(HttpServlet servlet){
             this(servlet, null);
         }
-        
+
         private RequestHandler(HttpServlet servlet, SessionDataStore sessionStore){
             this.servlet = servlet;
             this.sessionStore = sessionStore;
         }
-        
-        
+
+
         @Override
         public void doStart() throws Exception {
 
-            
+
           //Initialize ServletContext
             ContextHandler.Context context=ContextHandler.getCurrentContext();
             javax.servlet.ServletContext servletContext=context==null?new ContextHandler.StaticContext():context;
 
-            
+
           //Add the RequestHandler to the ServletContext
             servletContext.setAttribute("org.eclipse.jetty.server.Handler", this);
 
-            
+
           //Add ServletContext to the HttpServlet
             servlet.setServletContext(new ServletContext(servletContext));
 
 
-          //Get server info. The server info is found in the jar file so do this  
+          //Get server info. The server info is found in the jar file so do this
           //now instead of at run-time with the first http request...
             String jettyVersion = servletContext.getServerInfo();
             String javaxtVersion = servlet.getServletContext().getServerInfo();
-            if (1<0) System.out.println(javaxtVersion + " (" + jettyVersion + ")"); 
+            if (1<0) System.out.println(javaxtVersion + " (" + jettyVersion + ")");
 
-        
+
           //Start the session handler
             sessionHandler = new SessionHandler();
             DefaultSessionCache sessionCache = new DefaultSessionCache(sessionHandler);
             if (sessionStore==null) sessionStore = new SessionStore();
             sessionCache.setSessionDataStore(sessionStore);
-            sessionHandler.setSessionCache(sessionCache);  
+            sessionHandler.setSessionCache(sessionCache);
             try{
                 org.eclipse.jetty.server.Server server = this.getServer();
                 sessionHandler.setServer(server);
@@ -437,7 +669,7 @@ public class Server extends Thread {
                 _sessionIdManager=new DefaultSessionIdManager(server);
                 server.setSessionIdManager(_sessionIdManager);
                 server.manage(_sessionIdManager);
-                _sessionIdManager.start();            
+                _sessionIdManager.start();
                 */
 
             }
@@ -445,26 +677,26 @@ public class Server extends Thread {
                 e.printStackTrace();
             }
 
-            
+
             javax.servlet.ServletConfig ServletConfig = null;
             servlet.init(ServletConfig);
-            
-            
+
+
           //Call parent
             super.doStart();
         }
-        
+
         @Override
         public void handle(
-            String target, Request baseRequest, 
-            javax.servlet.http.HttpServletRequest request, 
-            javax.servlet.http.HttpServletResponse response) 
+            String target, Request baseRequest,
+            javax.servlet.http.HttpServletRequest request,
+            javax.servlet.http.HttpServletResponse response)
             throws IOException, javax.servlet.ServletException {
 
           //Add reference to the baseRequest to the HttpServletRequest
             request.setAttribute("org.eclipse.jetty.server.Request", baseRequest);
 
-            
+
           //Set session handler
             baseRequest.setSessionHandler(sessionHandler);
 
@@ -495,26 +727,68 @@ public class Server extends Thread {
                 throw e;
             }
             catch(ServletException e){
-                response.setStatus(e.getStatusCode(), e.getMessage());            
                 //response.sendError(e.getStatusCode(), e.getMessage());
+                sendError(e, _request, _response, request, response);
                 baseRequest.setHandled(true);
             }
-            catch(Exception e){
-                throw new javax.servlet.ServletException(e);
+            catch(Throwable e){ //Catches both errors and exceptions
+                //throw new javax.servlet.ServletException(e);
+                String s = e.getClass().getName();
+                String message = e.getLocalizedMessage();
+                s = (message != null) ? (s + ": " + message) : s;
+                ServletException ex = new ServletException(500, s);
+                ex.setStackTrace(e.getStackTrace());
+                sendError(ex, _request, _response, request, response);
             }
         }
-        
-        
+
+
+        private void sendError(
+            ServletException e, HttpServletRequest request, HttpServletResponse response,
+            javax.servlet.http.HttpServletRequest req, javax.servlet.http.HttpServletResponse rsp)
+        {
+            log(e.getMessage());
+            try{
+                if (request==null){
+                    request = new HttpServletRequest(req, exceptionServlet);
+                    response = new HttpServletResponse(request, rsp);
+                }
+                else{
+                    if (response==null){
+                        response = new HttpServletResponse(request, rsp);
+                    }
+                }
+
+                response.setStatus(e.getStatusCode());
+                response.setContentType("text/plain");
+                //response.write(e.getMessage());
+
+                String s = e.getClass().getName();
+                s = s.substring(s.lastIndexOf(".")+1);
+                String message = e.getLocalizedMessage();
+                String error = (message != null) ? (s + ": " + message) : s;
+                for (StackTraceElement x : e.getStackTrace()){
+                    error+="\n"+x;
+                }
+                response.write(error);
+            }
+            catch(Exception ex){
+                //TODO: Need to propgate error to the client!
+                //ex.printStackTrace();
+            }
+        }
+
+
         @Override
         public void doStop(){
             servlet.destroy();
         }
     }
-    
 
-    
-    
-    
+
+
+
+
 
   //**************************************************************************
   //** _SslConnectionFactory
@@ -545,15 +819,15 @@ public class Server extends Thread {
             super.doStart();
             final SSLEngine engine = this._sslContextFactory.newSSLEngine();
             engine.setUseClientMode(false);
-            
-            
+
+
             /*
             for (String protocol : engine.getEnabledProtocols()) System.out.println("- " + protocol);
             for (String protocol : engine.getSupportedProtocols()) System.out.println(protocol);
             for (String cipher : engine.getEnabledCipherSuites()) System.out.println(cipher);
-            String supportedCiphers[] = engine.getSupportedCipherSuites();            
+            String supportedCiphers[] = engine.getSupportedCipherSuites();
             */
-            
+
             final SSLSession session = engine.getSession();
             if(session.getPacketBufferSize() > this.getInputBufferSize()) this.setInputBufferSize(session.getPacketBufferSize());
         }
@@ -565,10 +839,10 @@ public class Server extends Thread {
             if (bytes == null || bytes.length == 0) {
                 //System.out.println("NO-Data in newConnection : "+aheadEndpoint.getRemoteAddress());
                 isSSL = true;
-            } 
+            }
             else {
                 final byte b = bytes[0];    // TLS first byte is 0x16 , SSLv2 first byte is >= 0x80 , HTTP is guaranteed many bytes of ASCII
-                isSSL = b >= 0x7F || (b < 0x20 && b != '\n' && b != '\r' && b != '\t');    
+                isSSL = b >= 0x7F || (b < 0x20 && b != '\n' && b != '\r' && b != '\t');
 
 //              //The following logic is from JavaXT Server 2.x
 //                if ((b>19 && b<25) || b==-128){
@@ -586,7 +860,7 @@ public class Server extends Thread {
                 sslConnection.setRenegotiationAllowed(this._sslContextFactory.isRenegotiationAllowed());
                 this.configure(sslConnection, connector, aheadEndpoint);
                 plainEndpoint = sslConnection.getDecryptedEndPoint();
-            } 
+            }
             else {
                 sslConnection = null;
                 plainEndpoint = aheadEndpoint;
@@ -644,19 +918,19 @@ public class Server extends Thread {
             public byte[] getBytes() { if (pendingException == null) { try { readAhead(); } catch (final IOException e) { pendingException = e; } } return bytes; }
             private void throwPendingException() throws IOException { if (pendingException != null) { final IOException e = pendingException; pendingException = null; throw e; } }
 
-            public ReadAheadEndpoint(final EndPoint channel, final int readAheadLength){                
+            public ReadAheadEndpoint(final EndPoint channel, final int readAheadLength){
                 this.endPoint = channel;
                 start = ByteBuffer.wrap(bytes = new byte[readAheadLength]);
                 start.flip();
                 leftToRead = readAheadLength;
             }
-            
+
             private synchronized void readAhead() throws IOException {
                 if (leftToRead > 0) {
-                    
+
                     int numBytesRead = endPoint.fill(start);
                     int numRetries = 0;
-                                                                                
+
                     if (numBytesRead==0){
 
 
@@ -708,16 +982,16 @@ public class Server extends Thread {
                 return sr + endPoint.fill(dst);
             }
 
-        }    
+        }
 
-    }    
-    
-    
+    }
+
+
 
   //**************************************************************************
   //** ServerLog
   //**************************************************************************
-  /** Implementation of a Jetty Logger. This logger actually doesn't log 
+  /** Implementation of a Jetty Logger. This logger actually doesn't log
    *  anything. You can use a different logger at any time by calling
    *  org.eclipse.jetty.util.log.Log.setLog();
    */
@@ -804,19 +1078,19 @@ public class Server extends Thread {
             return "";
         }
     }
-    
-    
+
+
   //**************************************************************************
   //** SessionStore
   //**************************************************************************
   /** Implementation of a Jetty SessionStore. This store actually doesn't do
-   *  anything. 
+   *  anything.
    */
     private static class SessionStore extends AbstractSessionDataStore {
-        
-       
+
+
         @Override
-        public SessionData load(String id) throws Exception { 
+        public SessionData load(String id) throws Exception {
             return null;
         }
 
@@ -850,7 +1124,7 @@ public class Server extends Thread {
         @Override
         public boolean exists(String id){
             return false;
-        }        
-        
+        }
+
     }
 }

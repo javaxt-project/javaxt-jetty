@@ -20,6 +20,7 @@ public abstract class HttpServlet {
     private javax.net.ssl.TrustManager[] tms;
     private String sslProvider;
     private ServletContext servletContext;
+    private String servletPath = "/";
 
 
   //**************************************************************************
@@ -34,12 +35,12 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** destroy
   //**************************************************************************
-  /** Called by the servlet container to indicate to a servlet that it is 
+  /** Called by the servlet container to indicate to a servlet that it is
    *  being taken out of service or that the server is shutting down.
    */
     public void destroy(){};
-    
-    
+
+
   //**************************************************************************
   //** processRequest
   //**************************************************************************
@@ -58,43 +59,73 @@ public abstract class HttpServlet {
     public ServletContext getServletContext(){
         return servletContext;
     }
-    
-    
+
+
   //**************************************************************************
   //** setServletContext
   //**************************************************************************
     public void setServletContext(ServletContext servletContext){
         this.servletContext = servletContext;
     }
-    
+
+
+  //**************************************************************************
+  //** getServletPath
+  //**************************************************************************
+  /** Returns the path to the servlet. This path starts with a "/" character
+   *  and includes either the servlet name or a path to the servlet, but does
+   *  not include any extra path information or a query string.
+   */
+    public String getServletPath(){
+        return servletPath;
+    }
+
+
+  //**************************************************************************
+  //** setServletPath
+  //**************************************************************************
+  /** Used to set the path to the servlet.
+   */
+    public void setServletPath(String servletPath){
+        if (servletPath==null){
+            servletPath = "/";
+        }
+        else{
+            if (servletPath.length()>1 && servletPath.startsWith("/")) servletPath = servletPath.substring(1);
+            if (servletPath.endsWith("/")) servletPath = servletPath.substring(0, servletPath.length()-1);
+            servletPath = "/" + servletPath;
+        }
+        this.servletPath = servletPath;
+    }
+
 
   //**************************************************************************
   //** log
   //**************************************************************************
-  /** Writes the specified message to a servlet log. This method has not 
+  /** Writes the specified message to a servlet log. This method has not
    *  been implemented.
    */
     public void log(String str){
         //TODO: Implement logger
     }
 
-    
-    
+
+
 //  //**************************************************************************
 //  //** setPaths
 //  //**************************************************************************
-//  /** Used to set the context and servlet paths used in the 
-//   *  HttpServletRequest.getContextPath() and the 
-//   *  HttpServletRequest.getServletPath() methods. 
-//   */    
+//  /** Used to set the context and servlet paths used in the
+//   *  HttpServletRequest.getContextPath() and the
+//   *  HttpServletRequest.getServletPath() methods.
+//   */
 //    public void setPaths(String contextPath, String servletPath){
 //      //TODO: Update logic used to assign context path
 //        //this.getServletContext().setContextPath(contextPath);
 //        //this.servletPath = servletPath;
 //    }
 
-    
-    
+
+
 //  //**************************************************************************
 //  //** setSessionStore
 //  //**************************************************************************
@@ -103,7 +134,7 @@ public abstract class HttpServlet {
 //        sessionStore.setStoreDir(file);
 //        this.sessionStore = sessionStore;
 //    }
-//    
+//
 
   //**************************************************************************
   //** setAuthenticator
@@ -129,7 +160,7 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** setKeyStore
   //**************************************************************************
-  /** Used to specify a KeyStore. The KeyStore is used to store keys and 
+  /** Used to specify a KeyStore. The KeyStore is used to store keys and
    *  certificates for SSL.
    */
     public void setKeyStore(KeyStore keystore, String passphrase) throws Exception {
@@ -142,7 +173,7 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** setKeyStore
   //**************************************************************************
-  /** Used to specify a KeyStore. The KeyStore is used to store keys and 
+  /** Used to specify a KeyStore. The KeyStore is used to store keys and
    *  certificates for SSL.
    */
     public void setKeyStore(java.io.File keyStoreFile, String passphrase) throws Exception {
@@ -156,13 +187,13 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** setKeyManager
   //**************************************************************************
-  /** Used to specify a KeyManager. The KeyManager is responsible for managing 
+  /** Used to specify a KeyManager. The KeyManager is responsible for managing
    *  keys and certificates found in a KeyStore and is used to initialize the
-   *  SSLContext. Typically, users are not required to specify a KeyManager. 
-   *  Instead, a KeyManager is selected for you whenever the setKeyStore() 
+   *  SSLContext. Typically, users are not required to specify a KeyManager.
+   *  Instead, a KeyManager is selected for you whenever the setKeyStore()
    *  method is called. However, in some cases, the default KeyManager is not
    *  adequate (e.g. managing KeyStores with multiple SSL certificates) and
-   *  users need to specify a different KeyManager. 
+   *  users need to specify a different KeyManager.
    */
     public void setKeyManager(javax.net.ssl.KeyManager keyManager) throws Exception {
         kms = new javax.net.ssl.KeyManager[]{keyManager};
@@ -223,11 +254,11 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** getSSLContext
   //**************************************************************************
-  /** Used to initialize an SSLContext which, in turn is used by an SSLEngine 
+  /** Used to initialize an SSLContext which, in turn is used by an SSLEngine
    *  decrypt SSL/TLS messages.
    */
     public SSLContext getSSLContext() throws ServletException {
-        
+
         /*//Debug use only!
         java.security.Provider provider = new SSLProvider();
         java.security.Security.addProvider(provider);
@@ -245,7 +276,7 @@ public abstract class HttpServlet {
             se.initCause(e);
             throw se;
         }
-        
+
         return sslContext;
     }
 
@@ -253,8 +284,8 @@ public abstract class HttpServlet {
   //**************************************************************************
   //** supportsHttps
   //**************************************************************************
-  /** Returns true if the servlet has been configured to support HTTP/SSL. 
-   *  This is determined by checking if a KeyStore or a KeyManager has been 
+  /** Returns true if the servlet has been configured to support HTTP/SSL.
+   *  This is determined by checking if a KeyStore or a KeyManager has been
    *  assigned.
    */
     public boolean supportsHttps(){

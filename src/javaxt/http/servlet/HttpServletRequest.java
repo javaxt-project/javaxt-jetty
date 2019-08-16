@@ -24,27 +24,29 @@ public class HttpServletRequest {
 
     private javax.servlet.http.HttpServletRequest request;
     private ServletContext servletContext;
-    
+    private String servletPath;
+
     private java.net.URL url;
     private Boolean isKeepAlive;
-    
+
     private Authenticator authenticator;
     private boolean authenticate = true;
     private ServletException authenticationException = null;
     private java.security.Principal principal;
     private boolean getUserPrincipal = true;
     private boolean getCredentials = true;
-    private String[] credentials = null;    
-    
-    
+    private String[] credentials = null;
+
+
     public HttpServletRequest(javax.servlet.http.HttpServletRequest request, HttpServlet servlet){
         this.request = request;
+        this.servletPath = servlet.getServletPath();
         this.servletContext = servlet.getServletContext();
-        
+
         try{
             StringBuffer str = request.getRequestURL();
             String query = request.getQueryString();
-            if (query!=null){ 
+            if (query!=null){
                 str.append("?");
                 str.append(query);
             }
@@ -54,8 +56,8 @@ public class HttpServletRequest {
             e.printStackTrace();
             //Should never happen...
         }
-        
-        
+
+
       //Instantiate the authenticator
         try{
             authenticator = servlet.getAuthenticator(this);
@@ -64,13 +66,13 @@ public class HttpServletRequest {
             //TODO: Figure out how to propogate this error to the caller!
             e.printStackTrace();
         }
-        
+
     }
-    
+
     protected javax.servlet.http.HttpServletRequest getBaseRequest(){
         return request;
     }
-    
+
 
   //**************************************************************************
   //** getRemoteAddr
@@ -85,7 +87,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getRemoteHost
   //**************************************************************************
-  /** Returns the hostname of the client that sent the request. 
+  /** Returns the hostname of the client that sent the request.
    */
     public String getRemoteHost(){
         return request.getRemoteHost();
@@ -101,11 +103,11 @@ public class HttpServletRequest {
         return request.getRemotePort();
     }
 
-    
+
   //**************************************************************************
   //** getHttpVersion
   //**************************************************************************
-  /** Returns the HTTP version number passed in as part of the request (e.g. 
+  /** Returns the HTTP version number passed in as part of the request (e.g.
    *  "1.0", "1.1", etc).
    */
     public String getHttpVersion(){
@@ -116,8 +118,8 @@ public class HttpServletRequest {
         }
         return null;
     }
-    
-    
+
+
   //**************************************************************************
   //** getHeader
   //**************************************************************************
@@ -126,9 +128,9 @@ public class HttpServletRequest {
    *  returns null. If there are multiple headers with the same name, this
    *  method returns the first head in the request. The header name is case
    *  insensitive.
-   * 
+   *
    *  @param name A String specifying the header name (e.g. "Content-Encoding")
-   *  The header name is case insensitive. 
+   *  The header name is case insensitive.
    */
     public String getHeader(String name){
         return request.getHeader(name);
@@ -147,11 +149,11 @@ public class HttpServletRequest {
   //** getHeaders
   //**************************************************************************
   /** Returns all the values of the specified request header as an Enumeration.
-   *  If the request did not include any headers of the specified name, this 
+   *  If the request did not include any headers of the specified name, this
    *  method returns an empty Enumeration.
    *
    *  @param name A String specifying the header name (e.g. "Accept-Language").
-   *  The header name is case insensitive. 
+   *  The header name is case insensitive.
    */
     public java.util.Enumeration<String> getHeaders(String name){
         return request.getHeaders(name);
@@ -161,7 +163,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getHeaderNames
   //**************************************************************************
-  /** Returns an enumeration of all the header names this request contains. If 
+  /** Returns an enumeration of all the header names this request contains. If
    *  the request has no headers, this method returns an empty enumeration.
    */
     public java.util.Enumeration<String> getHeaderNames(){
@@ -173,10 +175,10 @@ public class HttpServletRequest {
   //** getIntHeader
   //**************************************************************************
   /** Returns the value of the specified request header as an int. If the
-   *  request does not have a header of the specified name, this method 
+   *  request does not have a header of the specified name, this method
    *  returns -1. If the header cannot be converted to an integer, this method
    *  throws a NumberFormatException.
-   * 
+   *
    *  @param name A String specifying the header name (e.g. "Content-Length").
    *  The header name is case insensitive.
    */
@@ -184,13 +186,13 @@ public class HttpServletRequest {
         return request.getIntHeader(name);
     }
 
-    
+
   //**************************************************************************
   //** getDateHeader
   //**************************************************************************
   /** Returns the value of the specified request header as a long representing
-   *  the number of milliseconds since January 1, 1970 GMT. If the request did 
-   *  not have a header of the specified name, this method returns -1. If the 
+   *  the number of milliseconds since January 1, 1970 GMT. If the request did
+   *  not have a header of the specified name, this method returns -1. If the
    *  header can't be converted to a date, the method throws an
    *  IllegalArgumentException.
    *
@@ -207,7 +209,7 @@ public class HttpServletRequest {
   //**************************************************************************
   /** Returns the name of the character encoding used in the body of this
    *  request as specified in the "Content-Type" in the request header (e.g.
-   *  "UTF-8"). Returns a null if the request does not specify a character 
+   *  "UTF-8"). Returns a null if the request does not specify a character
    *  encoding.
    */
     public String getCharacterEncoding(){
@@ -242,8 +244,8 @@ public class HttpServletRequest {
   //** getLocale
   //**************************************************************************
   /** Returns the preferred Locale that the client will accept content in,
-   *  based on the "Accept-Language" header. If the client request doesn't 
-   *  provide an Accept-Language header, this method returns the default 
+   *  based on the "Accept-Language" header. If the client request doesn't
+   *  provide an Accept-Language header, this method returns the default
    *  locale for the server.
    */
     public Locale getLocale(){
@@ -254,10 +256,10 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getLocales
   //**************************************************************************
-  /** Returns an Enumeration of Locale objects indicating the locales that are 
+  /** Returns an Enumeration of Locale objects indicating the locales that are
    *  acceptable to the client based on the Accept-Language header. The list
-   *  of Locales is ordered, starting with the preferred locale. If the client 
-   *  request doesn't provide an Accept-Language header, this method returns 
+   *  of Locales is ordered, starting with the preferred locale. If the client
+   *  request doesn't provide an Accept-Language header, this method returns
    *  an Enumeration containing one Locale, the default locale for the server.
    */
     public java.util.Enumeration<Locale> getLocales(){
@@ -315,8 +317,8 @@ public class HttpServletRequest {
   //** getServerName
   //**************************************************************************
   /** Returns the host name of the server to which the request was sent.
-   *  It is the value of the part before ":" in the "Host" header, 
-   *  header value, if any, or the resolved server name, or the server IP 
+   *  It is the value of the part before ":" in the "Host" header,
+   *  header value, if any, or the resolved server name, or the server IP
    *  address.
    */
     public String getServerName(){
@@ -328,15 +330,15 @@ public class HttpServletRequest {
   //** getServerPort
   //**************************************************************************
   /** Returns the port number to which the request was sent. It is the value
-   *  of the part after ":" in the Host header value, if any, or the server 
-   *  port where the client connection was accepted on. 
+   *  of the part after ":" in the Host header value, if any, or the server
+   *  port where the client connection was accepted on.
    */
     public int getServerPort(){
         //return request.getServerPort();
         return getPort();
     }
-    
-    
+
+
   /** Returns the host name of the Internet Protocol (IP) interface on which
    *  the request was received.
    */
@@ -352,14 +354,14 @@ public class HttpServletRequest {
     }
 
 
-  /** Returns the Internet Protocol (IP) port number of the interface on which 
+  /** Returns the Internet Protocol (IP) port number of the interface on which
    *  the request was received.
    */
     public int getLocalPort(){
         return request.getLocalPort();
     }
-    
-//    
+
+//
 //  //**************************************************************************
 //  //** setHost
 //  //**************************************************************************
@@ -444,7 +446,7 @@ public class HttpServletRequest {
 
   //**************************************************************************
   //** isSecure
-  //**************************************************************************    
+  //**************************************************************************
   /** Returns a boolean indicating whether this request was made using a
    *  secure channel, such as HTTPS.
    */
@@ -456,7 +458,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getProtocol
   //**************************************************************************
-  /** Returns the name and version of the protocol the request uses in the 
+  /** Returns the name and version of the protocol the request uses in the
    *  form <i>protocol/majorVersion.minorVersion</i> (e.g. "HTTP/1.1").
    */
     public String getProtocol(){
@@ -486,10 +488,10 @@ public class HttpServletRequest {
 
 
   //**************************************************************************
-  //** getRequestURI 
+  //** getRequestURI
   //**************************************************************************
   /** Returns the part of this request's URL from the protocol name up to the
-   *  query string in the first line of the HTTP request. The web container 
+   *  query string in the first line of the HTTP request. The web container
    *  does not decode this String
    *  For example:
 
@@ -518,8 +520,8 @@ public class HttpServletRequest {
   //** getRequestURL
   //**************************************************************************
   /** Reconstructs the URL the client used to make the request. The returned
-   *  URL contains a protocol, server name, port number, and server path, but 
-   *  it does not include query string parameters. 
+   *  URL contains a protocol, server name, port number, and server path, but
+   *  it does not include query string parameters.
    */
     public StringBuffer getRequestURL(){
         return request.getRequestURL();
@@ -556,11 +558,11 @@ public class HttpServletRequest {
 
   //**************************************************************************
   //** getParameterNames
-  //**************************************************************************    
-  /** Returns an Enumeration of String objects containing the names of the 
-   *  parameters contained in the query string. If the request has no 
+  //**************************************************************************
+  /** Returns an Enumeration of String objects containing the names of the
+   *  parameters contained in the query string. If the request has no
    *  parameters, the method returns an empty Enumeration. <p/>
-   *  Note that this method does NOT retrieve or parse posted data from form 
+   *  Note that this method does NOT retrieve or parse posted data from form
    *  data. Use the getForm() method instead.
    */
     public java.util.Enumeration<String> getParameterNames(){
@@ -571,12 +573,12 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getParameterValues
   //**************************************************************************
-  /** Returns an array containing all of the values for a given query string 
+  /** Returns an array containing all of the values for a given query string
    *  parameter or null if the parameter does not exist.<p/>
-   *  Note that this method does NOT retrieve or parse posted data from form 
+   *  Note that this method does NOT retrieve or parse posted data from form
    *  data. Use the getForm() method instead.
    */
-    public String[] getParameterValues(String name){ 
+    public String[] getParameterValues(String name){
         return request.getParameterValues(name);
     }
 
@@ -584,10 +586,10 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getParameterMap
   //**************************************************************************
-  /** Returns an immutable java.util.Map containing parameters found in the 
-   *  query string. The keys in the parameter map are of type String. The 
+  /** Returns an immutable java.util.Map containing parameters found in the
+   *  query string. The keys in the parameter map are of type String. The
    *  values in the parameter map are of type String array.<p/>
-   *  Note that this method does NOT retrieve or parse posted data from form 
+   *  Note that this method does NOT retrieve or parse posted data from form
    *  data. Use the getForm() method instead.
    */
     public java.util.Map<String, String[]> getParameterMap(){
@@ -639,37 +641,37 @@ public class HttpServletRequest {
       //data from the socket.
         int contentLength = getContentLength();
         if (contentLength<1) return new byte[0];
-        
+
 
         final java.io.ByteArrayOutputStream bas = new java.io.ByteArrayOutputStream();
         final HttpInput input = (HttpInput) request.getInputStream();
-        int numBytesRead = -1; 
-        byte buffer[] = new byte[8192]; 
+        int numBytesRead = -1;
+        byte buffer[] = new byte[8192];
         while (input.isReady() && (numBytesRead = input.read(buffer)) != -1) {
-            ByteBuffer buf = ByteBuffer.wrap(buffer, 0, numBytesRead); 
+            ByteBuffer buf = ByteBuffer.wrap(buffer, 0, numBytesRead);
             byte[] b = new byte[numBytesRead];
             buf.get(b, 0, numBytesRead);
             bas.write(b);
             //if (bas.size()==contentLength) break;
         }
-     
+
         //bas.close();
         return bas.toByteArray();
     }
 
     private class StreamReader implements Runnable {
-        
+
         private java.io.ByteArrayOutputStream bas;
-        
+
         public StreamReader(java.io.ByteArrayOutputStream bas){
             this.bas = bas;
         }
-        
+
         public void run(){
 
             while (true){
             try{
-            
+
                 final HttpInput input = (HttpInput) request.getInputStream();
                 final javax.servlet.AsyncContext async = request.startAsync();
                 input.setReadListener(new javax.servlet.ReadListener() {
@@ -678,10 +680,10 @@ public class HttpServletRequest {
 
                     @Override
                     public void onDataAvailable() throws IOException {
-                        int numBytesRead = -1; 
-                        byte buffer[] = new byte[8192]; 
+                        int numBytesRead = -1;
+                        byte buffer[] = new byte[8192];
                         while (ready() && (numBytesRead = input.read(buffer)) != -1) {
-                            ByteBuffer buf = ByteBuffer.wrap(buffer, 0, numBytesRead); 
+                            ByteBuffer buf = ByteBuffer.wrap(buffer, 0, numBytesRead);
 
                             if (numBytesRead>0){
                                 byte[] b = new byte[numBytesRead];
@@ -692,7 +694,7 @@ public class HttpServletRequest {
                             }
                             else{
                                 break;
-                            }                 
+                            }
 
                         }
 
@@ -701,16 +703,16 @@ public class HttpServletRequest {
 
                     @Override
                     public void onAllDataRead() throws IOException {
-                        end(); 
+                        end();
                     }
 
                     @Override
                     public void onError(Throwable t) {
-                        request.getServletContext().log("Async Error",t);               
+                        request.getServletContext().log("Async Error",t);
                     }
 
 
-                    void end() { 
+                    void end() {
                         System.out.println("Done!");
 
                         async.complete();
@@ -721,29 +723,29 @@ public class HttpServletRequest {
                             e.printStackTrace();
                         }
 
-                    } 
+                    }
 
-                    boolean ready() { 
-                        return input.isReady(); 
-                    } 
+                    boolean ready() {
+                        return input.isReady();
+                    }
 
                 });
                 return;
-        
+
             }
             catch(Exception e){
                 return;
             }
-            
+
             }
         }
     }
-    
+
 
   //**************************************************************************
   //** getInputStream
   //**************************************************************************
-  /** Returns the body of the http request as an input stream. Automatically 
+  /** Returns the body of the http request as an input stream. Automatically
    *  decrypts the body if the data is SSL/TLS encrypted. Example:
    <pre>
         java.io.InputStream inputStream = request.getInputStream();
@@ -763,7 +765,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getReader
   //**************************************************************************
-  /** Returns a BufferedReader used to process the body of the http request. 
+  /** Returns a BufferedReader used to process the body of the http request.
    *  Automatically decrypts the body if the data is SSL/TLS encrypted.
    *  Either this method or getInputStream() may be called to read the body,
    *  but not both.
@@ -787,7 +789,7 @@ public class HttpServletRequest {
    *  <p/>
    *
    *  Here's a simple example of how to iterate through form data using the
-   *  getFormInputs() method. Note how easy it is to identify an uploaded 
+   *  getFormInputs() method. Note how easy it is to identify an uploaded
    *  file and save it to disk.
    <pre>
         java.util.Iterator&lt;FormInput&gt; it = request.getFormInputs();
@@ -805,7 +807,7 @@ public class HttpServletRequest {
             }
         }
    </pre>
-   *  Note that the form iterator reads data directly from the socket 
+   *  Note that the form iterator reads data directly from the socket
    *  connection. Therefore, you should only call this method once.
    *  <p/>
    *
@@ -917,7 +919,7 @@ public class HttpServletRequest {
   //**************************************************************************
   /** Returns the session ID specified by the client ("JSESSIONID" cookie).
    *  If the client did not specify a session ID, this method returns null.
-   *  Use the isRequestedSessionIdValid() method to verify whether the 
+   *  Use the isRequestedSessionIdValid() method to verify whether the
    *  session ID is valid.
    */
     public String getRequestedSessionId(){
@@ -937,13 +939,13 @@ public class HttpServletRequest {
   //**************************************************************************
   //** isRequestedSessionIdValid
   //**************************************************************************
-  /** Checks whether the requested session ID is still valid. Returns true if 
-   *  this request has an id for a valid session in the current session 
-   *  context. 
+  /** Checks whether the requested session ID is still valid. Returns true if
+   *  this request has an id for a valid session in the current session
+   *  context.
    */
     public boolean isRequestedSessionIdValid(){
         HttpSession session = getSession(false);
-        return session!=null;    
+        return session!=null;
     }
 
 
@@ -960,7 +962,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** isRequestedSessionIdFromURL
   //**************************************************************************
-  /** Checks whether the requested session ID came in as part of the request 
+  /** Checks whether the requested session ID came in as part of the request
    *  URL.
    */
     public boolean isRequestedSessionIdFromURL(){
@@ -971,7 +973,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** isRequestedSessionIdFromUrl
   //**************************************************************************
-  /** @deprecated As of Version 2.1 of the Java Servlet API. 
+  /** @deprecated As of Version 2.1 of the Java Servlet API.
    *  Use isRequestedSessionIdFromURL() instead.
    */
     public boolean isRequestedSessionIdFromUrl(){
@@ -982,7 +984,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getCookies
   //**************************************************************************
-  /** Returns an array containing all of the Cookie objects the client sent 
+  /** Returns an array containing all of the Cookie objects the client sent
    *  with this request. This method returns null if no cookies were sent.
    */
     public Cookie[] getCookies(){
@@ -998,12 +1000,12 @@ public class HttpServletRequest {
   //**************************************************************************
   //** setAttribute
   //**************************************************************************
-  /** Returns the value of a given attribute. Returns null if no attribute of 
+  /** Returns the value of a given attribute. Returns null if no attribute of
    *  the given name exists. <p/>
-   *  Attributes contain custom information about a request. Attributes are 
-   *  set programatically using the setAttribute() method and are typically 
-   *  used in conjunction with a RequestDispatcher. Attribute names should 
-   *  follow the same conventions as package names. The servlet specification 
+   *  Attributes contain custom information about a request. Attributes are
+   *  set programatically using the setAttribute() method and are typically
+   *  used in conjunction with a RequestDispatcher. Attribute names should
+   *  follow the same conventions as package names. The servlet specification
    *  reserves names matching "java.*", "javax.*", and "sun.*".
    */
     public Object getAttribute(String name){
@@ -1014,9 +1016,9 @@ public class HttpServletRequest {
   //**************************************************************************
   //** setAttribute
   //**************************************************************************
-  /** Used to add, update, or delete an attribute associated with this request. 
-   *  Attributes contain custom information about a request and are typically 
-   *  used in conjunction with a RequestDispatcher. If the object passed in is 
+  /** Used to add, update, or delete an attribute associated with this request.
+   *  Attributes contain custom information about a request and are typically
+   *  used in conjunction with a RequestDispatcher. If the object passed in is
    *  null, the effect is the same as calling removeAttribute().
    */
     public void setAttribute(String name, Object o){
@@ -1027,7 +1029,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** removeAttribute
   //**************************************************************************
-  /** Removes an attribute associated with this request. See getAttribute()   
+  /** Removes an attribute associated with this request. See getAttribute()
    *  and setAttribute() for more information.
    */
     public void removeAttribute(String name){
@@ -1038,9 +1040,9 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getAttributeNames
   //**************************************************************************
-  /** Returns an Enumeration containing the names of the attributes associated 
-   *  with this request. Returns an empty Enumeration if the request has no 
-   *  attributes associated with it. See getAttribute() and setAttribute() for  
+  /** Returns an Enumeration containing the names of the attributes associated
+   *  with this request. Returns an empty Enumeration if the request has no
+   *  attributes associated with it. See getAttribute() and setAttribute() for
    *  more information.
    */
     public java.util.Enumeration<String> getAttributeNames(){
@@ -1051,10 +1053,10 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getRequestDispatcher
   //**************************************************************************
-  /** This method is supposed to return a RequestDispatcher object that can be 
-   *  used to forward a request to the resource or to include the resource in 
+  /** This method is supposed to return a RequestDispatcher object that can be
+   *  used to forward a request to the resource or to include the resource in
    *  a response. This server does not currently support RequestDispatcher so
-   *  this method returns a null. 
+   *  this method returns a null.
    */
     public Object getRequestDispatcher(String path){
         return null; //RequestDispatcher
@@ -1062,30 +1064,43 @@ public class HttpServletRequest {
 
 
   //**************************************************************************
-  //** getRequestDispatcher
+  //** getRealPath
   //**************************************************************************
-  /** @deprecated As of Version 2.1 of the Java Servlet API. Use 
+  /** @deprecated As of Version 2.1 of the Java Servlet API. Use
    *  ServletContext.getRealPath() instead.
    */
     public String getRealPath(String path){
-        return request.getRealPath(path);
+        //return request.getRealPath(path);
+        return servletContext.getRealPath(path);
     }
 
 
   //**************************************************************************
   //** getPathInfo
   //**************************************************************************
-  /** Returns any extra path information associated with the URL the client 
-   *  sent when it made this request. The extra path information follows the 
+  /** Returns any extra path information associated with the URL the client
+   *  sent when it made this request. The extra path information follows the
    *  servlet path but precedes the query string and will start with a "/"
    *  character. Consider this example:
    *  <pre>http://localhost:8080/MyServlet/Extra/Path/?abc=123</pre>
    *  In this example, "/MyServlet" is the servlet path and this method will
    *  return "/Extra/Path/" as the extra path. If no extra path is found, this
-   *  method will return a null. 
+   *  method will return a null.
    */
     public String getPathInfo(){
-        return request.getPathInfo();
+        //return request.getPathInfo();
+        String path = this.getURL().getPath();
+        String servletPath = getContextPath()+getServletPath();
+        if (servletPath.length()>0){
+            int idx = path.toLowerCase().indexOf(servletPath.toLowerCase());
+            if (idx>-1){
+                path = path.substring(idx + servletPath.length());
+            }
+        }
+        if (path.length()==0) return null;
+        if (path.equals("/")) return null;
+        if (!path.startsWith("/")) path = "/" + path;
+        return path;
     }
 
 
@@ -1093,39 +1108,43 @@ public class HttpServletRequest {
   //** getPathTranslated
   //**************************************************************************
   /** Returns any extra path information after the servlet name but before the
-   *  query string, and translates it to a real path. If the URL does not have 
-   *  any extra path information, or if  the servlet container cannot  
-   *  translate the virtual path to a real path for any reason, this method 
+   *  query string, and translates it to a real path. If the URL does not have
+   *  any extra path information, or if  the servlet container cannot
+   *  translate the virtual path to a real path for any reason, this method
    *  returns a null.
    */
     public String getPathTranslated(){
-        return request.getPathTranslated();
+        //return request.getPathTranslated();
+        String path = getPathInfo();
+        if (path!=null) return getRealPath(path);
+        return null;
     }
 
 
   //**************************************************************************
   //** getContextPath
   //**************************************************************************
-  /** Returns a string in the requested URL that represents the servlet 
-   *  context. This is typically defined in the META-INF/context.xml file in 
-   *  Java EE web applications. For example, if a web application is called 
+  /** Returns a string in the requested URL that represents the servlet
+   *  context. This is typically defined in the META-INF/context.xml file in
+   *  Java EE web applications. For example, if a web application is called
    *  "WebApplication", the context path might be "/WebApplication". In this
    *  case, a requested URL will include the context path like this:
    *  <pre>http://localhost:8080/WebApplication/MyServlet/?abc=123</pre><p/>
-   *  
-   *  The context path always comes first in a request URL. The path starts 
-   *  with a "/" character but does not end with a "/" character. For servlets 
+   *
+   *  The context path always comes first in a request URL. The path starts
+   *  with a "/" character but does not end with a "/" character. For servlets
    *  in the default (root) context, this method returns "". <p/>
-   *  
+   *
    *  Note that this server does not currently support the container concept
    *  where multiple servlets are managed by a servlet container. Instead, we
    *  have a single servlet that processes all web requests and can dispatch
    *  the requests to other servlets. Therefore, to retrieve a "context path"
-   *  developers must explicitely set the "context path" in the servlet and 
+   *  developers must explicitely set the "context path" in the servlet and
    *  implement logic to generate/process the URLs accordingly.
    */
     public String getContextPath(){
-        return request.getContextPath();
+        //return request.getContextPath();
+        return servletContext.getContextPath();
     }
 
 
@@ -1133,22 +1152,23 @@ public class HttpServletRequest {
   //** getServletPath
   //**************************************************************************
   /** Returns a string in the requested URL that represents the servlet path.
-   *  This path starts with a "/" character and includes either the servlet 
+   *  This path starts with a "/" character and includes either the servlet
    *  name or a path to the servlet, but does not include any extra path
    *  information or a query string. For example, consider the following URL:
    *  <pre>http://localhost:8080/WebApplication/MyServlet/?abc=123</pre><p/>
    *  In this example, the context path is "/WebApplication" and "/MyServlet"
    *  is the servlet path. <p/>
-   * 
+   *
    *  Note that this server does not require a URL "Pattern" to be defined for
-   *  for individual servlets. Instead, we have a single servlet that processes 
-   *  all web requests and can dispatch the requests to other servlets. 
-   *  Therefore, to retrieve a "servlet path" developers must explicitely set 
-   *  the servlet path in the servlet and implement logic to process the  
+   *  for individual servlets. Instead, we have a single servlet that processes
+   *  all web requests and can dispatch the requests to other servlets.
+   *  Therefore, to retrieve a "servlet path" developers must explicitely set
+   *  the servlet path in the servlet and implement logic to process the
    *  URLs accordingly.
    */
     public String getServletPath(){
-        return request.getServletPath();
+        //return request.getServletPath();
+         return servletPath;
     }
 
 
@@ -1162,8 +1182,8 @@ public class HttpServletRequest {
 
   //**************************************************************************
   //** getAuthType
-  //**************************************************************************    
-  /** Returns the authentication scheme used to authenticate clients (e.g. 
+  //**************************************************************************
+  /** Returns the authentication scheme used to authenticate clients (e.g.
    *  "BASIC", "DIGEST", "CLIENT_CERT", etc). This value is retrieved from an
    *  Authenticator and does not necessarily correspond to the "Authorization"
    *  request header. If an Authenticator is not used to secure the servlet,
@@ -1175,7 +1195,7 @@ public class HttpServletRequest {
         else return null;
     }
 
-    
+
   //**************************************************************************
   //** getCredentials
   //**************************************************************************
@@ -1183,9 +1203,9 @@ public class HttpServletRequest {
    *  this request. The first element in the array represents the username and
    *  the second element represents the password. <p/>
    *  Credentials are retrieved from an Authenticator. If no Authenticator is
-   *  defined or if the Authenticator fails to parse the credentials, this 
+   *  defined or if the Authenticator fails to parse the credentials, this
    *  method returns a null.
-   */    
+   */
     public String[] getCredentials(){
         if (getCredentials){
             try {
@@ -1205,12 +1225,12 @@ public class HttpServletRequest {
   //** authenticate
   //**************************************************************************
   /** Used to authenticate a client request. Authentication is performed by an
-   *  Authenticator. If no Authenticator is defined or if the Authenticator 
+   *  Authenticator. If no Authenticator is defined or if the Authenticator
    *  fails to authenticate the client, this method throws a ServletException.
    */
     public void authenticate() throws ServletException {
         if (authenticate==true){
-            try{            
+            try{
                 authenticator.authenticate();
             }
             catch(ServletException e){
@@ -1222,10 +1242,10 @@ public class HttpServletRequest {
             }
             authenticate = false;
         }
-        
+
         if (authenticationException!=null) throw authenticationException;
     }
-    
+
 
   //**************************************************************************
   //** getRemoteUser
@@ -1249,7 +1269,7 @@ public class HttpServletRequest {
   //** isUserInRole
   //**************************************************************************
   /** Returns a boolean indicating whether the authenticated user is included
-   *  in the specified "role". Roles and role membership are often managed by 
+   *  in the specified "role". Roles and role membership are often managed by
    *  an Authenticator. If no Authenticator is defined, or if the user is not
    *  authenticated, or if no role is defined for the user, the method returns
    *  false.
@@ -1267,8 +1287,8 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getUserPrincipal
   //**************************************************************************
-  /** Returns a java.security.Principal object containing the name of the 
-   *  current authenticated user. User Principals are resolved by an 
+  /** Returns a java.security.Principal object containing the name of the
+   *  current authenticated user. User Principals are resolved by an
    *  Authenticator. If no Authenticator is defined, or if the user has not
    *  been authenticated, the method returns a null.
    */
@@ -1284,7 +1304,7 @@ public class HttpServletRequest {
         return principal;
     }
 
-    
+
     public AsyncContext startAsync() throws IllegalStateException{
         return request.startAsync();
     }
@@ -1308,8 +1328,8 @@ public class HttpServletRequest {
     public DispatcherType getDispatcherType(){
         return request.getDispatcherType();
     }
-    
-    
+
+
 
   //**************************************************************************
   //** toString
@@ -1317,9 +1337,9 @@ public class HttpServletRequest {
   /** Returns the full HTTP Request Header.
    */
     public String toString(){
-        
+
         StringBuffer out = new StringBuffer();
-        
+
         //GET /pub/WWW/TheProject.html HTTP/1.1
         out.append(getMethod());
         out.append(" ");
@@ -1327,8 +1347,8 @@ public class HttpServletRequest {
         out.append(" ");
         out.append(getProtocol());
         out.append("\r\n");
-        
-        
+
+
         java.util.Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String name = headerNames.nextElement();

@@ -21,7 +21,7 @@ public class FormValue {
     private byte[] value = null;
     private final static byte[] CRLF = new byte[]{'\r','\n'};
     private FormInputStream formInputStream;
-    
+
 
   //**************************************************************************
   //** Constructor
@@ -139,7 +139,7 @@ public class FormValue {
    */
     public Boolean toBoolean(){
         if (isNull()) return null;
-        
+
         String value = this.toString().toLowerCase().trim();
 
         if (value.equals("true")) return true;
@@ -371,7 +371,7 @@ public class FormValue {
                         read(arr);
 
                         String str = new String(arr);
-                        if (str.equals("--" + boundary)){
+                        if (str.equalsIgnoreCase("--" + boundary)){
 
                           //Read next few bytes: either "\r\n" or "--\r\n" or EOS
                             while (true){
@@ -413,7 +413,7 @@ public class FormValue {
                     break;
                 }
                 else{
-                    b[i] = (byte) x; 
+                    b[i] = (byte) x;
                     totalBytesRead++;
                 }
             }

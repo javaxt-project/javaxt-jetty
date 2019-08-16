@@ -7,8 +7,8 @@ package javaxt.http.servlet;
  *   Provides a mechanism to store application data across servlets. The
  *   ServletContext is initialized when the web server is initialized. There
  *   is only one context per Java Virtual Machine. <p/>
- * 
- *   This class is a partial implementation of the javax.servlet.ServletContext 
+ *
+ *   This class is a partial implementation of the javax.servlet.ServletContext
  *   interface defined in Version 2.5 of the Java Servlet API.
  *
  ******************************************************************************/
@@ -18,21 +18,24 @@ public class ServletContext {
     private String serverInfo;
     private java.io.File jarFile;
     private javax.servlet.ServletContext servletContext;
-
     
+    public final String PathSeparator = System.getProperty("file.separator");
+    private String contextPath = "";
+
+
   //**************************************************************************
   //** Constructor
   //**************************************************************************
     public ServletContext(javax.servlet.ServletContext servletContext) {
         this.servletContext = servletContext;
     }
-    
+
 
   //**************************************************************************
   //** getMajorVersion
   //**************************************************************************
   /** Returns the major version of the Java Servlet API that this
-   *  servlet container supports. 
+   *  servlet container supports.
    */
     public int getMajorVersion(){
         return servletContext.getMajorVersion();
@@ -42,7 +45,7 @@ public class ServletContext {
   //**************************************************************************
   //** getMinorVersion
   //**************************************************************************
-  /** Returns the minor version of the Servlet API that this servlet container 
+  /** Returns the minor version of the Servlet API that this servlet container
    *  supports.
    */
     public int getMinorVersion(){
@@ -66,21 +69,21 @@ public class ServletContext {
   //**************************************************************************
   /** Binds an object to a given attribute name in this servlet context. If
    *  the name specified is already used for an attribute, this method will
-   *  replace the attribute with the new to the new attribute. If a null value 
-   *  is passed, the effect is the same as calling removeAttribute(). If 
-   *  listeners are configured on the ServletContext the container notifies 
+   *  replace the attribute with the new to the new attribute. If a null value
+   *  is passed, the effect is the same as calling removeAttribute(). If
+   *  listeners are configured on the ServletContext the container notifies
    *  them accordingly.
    */
     public void setAttribute(String name, Object value){
         servletContext.setAttribute(name, value);
     }
-    
+
 
   //**************************************************************************
   //** removeAttribute
-  //**************************************************************************    
+  //**************************************************************************
   /** Removes the attribute with the given name from the servlet context. If
-   *  listeners are configured on the ServletContext the container notifies 
+   *  listeners are configured on the ServletContext the container notifies
    *  them accordingly.
    */
     public void removeAttribute(String name){
@@ -99,12 +102,12 @@ public class ServletContext {
         return servletContext.getAttributeNames();
     }
 
-    
+
   //**************************************************************************
   //** getContext
-  //**************************************************************************    
-  /** Returns a ServletContext object that corresponds to a specified URL on 
-   *  the server, or null if either none exists or the container wishes to 
+  //**************************************************************************
+  /** Returns a ServletContext object that corresponds to a specified URL on
+   *  the server, or null if either none exists or the container wishes to
    *  restrict this access.
    *
      * <p>This method allows servlets to gain
@@ -118,30 +121,31 @@ public class ServletContext {
         return servletContext.getContext(uripath);
     }
 
- 
+
   //**************************************************************************
   //** getContextPath
   //**************************************************************************
   /** */
     public String getContextPath(){
-        return servletContext.getContextPath();
+        return contextPath;
     }
 
-//    public void setContextPath(String contextPath){
-//        servletContext.setCon
-//    }
+    public void setContextPath(String contextPath){
+        this.contextPath = contextPath;
+    }
 
-    
+
+
   //**************************************************************************
   //** getServletContextName
   //**************************************************************************
-  /** Returns the name of the web application or null if no name has been 
-   *  declared in the deployment descriptor. 
+  /** Returns the name of the web application or null if no name has been
+   *  declared in the deployment descriptor.
    */
     public String getServletContextName(){
         return servletContext.getServletContextName();
     }
-    
+
 //    public void setServletContextName(String contextName){
 //        this.contextName = contextName;
 //    }
@@ -151,7 +155,7 @@ public class ServletContext {
   //** getMimeType
   //**************************************************************************
   /** Returns the MIME type of the specified file, or <code>null</code> if
-   *  the MIME type is not known. The MIME type is determined by the 
+   *  the MIME type is not known. The MIME type is determined by the
    *  configuration of the servlet container, and may be specified
    *  in a web application deployment descriptor. Common MIME
    *  types are <code>"text/html"</code> and <code>"image/gif"</code>.
@@ -160,14 +164,14 @@ public class ServletContext {
         return servletContext.getMimeType(file);
     }
 
-    
+
   //**************************************************************************
   //** getResourcePaths
   //**************************************************************************
-  /** Returns a directory-like listing of all the paths to resources within 
-   *  the web application whose longest sub-path matches the supplied path 
-   *  argument. Paths indicating subdirectory paths end with a '/'. The 
-   *  returned paths are all relative to the root of the web application and 
+  /** Returns a directory-like listing of all the paths to resources within
+   *  the web application whose longest sub-path matches the supplied path
+   *  argument. Paths indicating subdirectory paths end with a '/'. The
+   *  returned paths are all relative to the root of the web application and
    *  have a leading '/'. Consider, for example, a web application containing:
     <pre>
         /welcome.html
@@ -180,12 +184,12 @@ public class ServletContext {
         /WEB-INF/classes/com.acme.OrderServlet.class
     </pre>
    *
-   *  context.getResourcePaths("/") would return "/welcome.html", "/catalog/", 
+   *  context.getResourcePaths("/") would return "/welcome.html", "/catalog/",
    * "/customer/", "/WEB-INF/"<br/>
-   *  context.getResourcePaths("/catalog/") would return "/catalog/index.html", 
+   *  context.getResourcePaths("/catalog/") would return "/catalog/index.html",
    * "/catalog/products.html", "/catalog/offers/".
-   * 
-   *  @param path The partial path used to match the resources, which must 
+   *
+   *  @param path The partial path used to match the resources, which must
    *  start with a "/".
    */
     public java.util.Set<String> getResourcePaths(String path){
@@ -273,7 +277,7 @@ public class ServletContext {
   //**************************************************************************
   //** getRequestDispatcher
   //**************************************************************************
-  /** Returns a RequestDispatcher that acts as a wrapper for a resource 
+  /** Returns a RequestDispatcher that acts as a wrapper for a resource
    *  located at the given path. A RequestDispatcher can be used to forward a
    *  request to the resource or to include the resource in a response. The
    *  resource can be dynamic or static. <p/>
@@ -293,13 +297,13 @@ public class ServletContext {
   //** getNamedDispatcher
   //**************************************************************************
   /** Returns a RequestDispatcher that acts as a wrapper for the named servlet.
-   *  Returns a null if the ServletContext cannot return a RequestDispatcher 
+   *  Returns a null if the ServletContext cannot return a RequestDispatcher
    *  for any reason.
    *
-   *  Servlets are given names programatically or via a web application 
+   *  Servlets are given names programatically or via a web application
    *  deployment descriptor. A servlet instance can determine its name using
    *  ServletConfig.getServletName().
-   * 
+   *
    *  @param name A String specifying the name of a servlet to wrap.
    */
     public Object getNamedDispatcher(String name){
@@ -310,8 +314,8 @@ public class ServletContext {
   //**************************************************************************
   //** getServlet
   //**************************************************************************
-  /** @deprecated As of Java Servlet API 2.1, with no direct replacement. This 
-   *  method will be permanently removed in a future version of the Java 
+  /** @deprecated As of Java Servlet API 2.1, with no direct replacement. This
+   *  method will be permanently removed in a future version of the Java
    *  Servlet API.
    *  @return null
    */
@@ -323,8 +327,8 @@ public class ServletContext {
   //**************************************************************************
   //** getServlets
   //**************************************************************************
-  /** @deprecated As of Java Servlet API 2.0, with no replacement. This 
-   *  method will be permanently removed in a future version of the Java 
+  /** @deprecated As of Java Servlet API 2.0, with no replacement. This
+   *  method will be permanently removed in a future version of the Java
    *  Servlet API.
    *  @return null
    */
@@ -336,8 +340,8 @@ public class ServletContext {
   //**************************************************************************
   //** getServletNames
   //**************************************************************************
-  /** @deprecated As of Java Servlet API 2.1, with no direct replacement. This 
-   *  method will be permanently removed in a future version of the Java 
+  /** @deprecated As of Java Servlet API 2.1, with no direct replacement. This
+   *  method will be permanently removed in a future version of the Java
    *  Servlet API.
    *  @return null
    */
@@ -349,7 +353,7 @@ public class ServletContext {
   //**************************************************************************
   //** log
   //**************************************************************************
-  /** Writes the specified message to a servlet log file. 
+  /** Writes the specified message to a servlet log file.
    */
     public void log(String msg){
         //TODO: Implement logger
@@ -361,7 +365,7 @@ public class ServletContext {
   //**************************************************************************
   /** Writes an exception's stack trace and an explanatory error message to
    *  the servlet log file.
-   *  @deprecated As of Java Servlet API 2.1, use log(message, throwable) 
+   *  @deprecated As of Java Servlet API 2.1, use log(message, throwable)
    *  instead.
    */
     public void log(Exception exception, String msg){
@@ -383,22 +387,78 @@ public class ServletContext {
   //**************************************************************************
   //** getRealPath
   //**************************************************************************
-  /** Returns a String containing the real path for a given virtual path. For 
+  /** Returns a String containing the real path for a given virtual path. For
    *  example, the path "/index.html" found in:
    *  <pre>http://localhost:8080/WebApplication/index.html</pre>
    *  might represent a physical file found in:
    *  <pre>D:\WebApps\WebApplication\index.html</pre>
    *
-   *  The real path returned will be in a form appropriate to the computer and 
-   *  operating system on which the servlet container is running, including 
-   *  the proper path separators. This method returns null if the servlet 
-   *  container cannot translate the virtual path to a real path for any 
-   *  reason .
+   *  The real path returned will be in a form appropriate to the computer and
+   *  operating system on which the servlet container is running, including
+   *  the proper path separators. This method returns null if the servlet
+   *  container cannot translate the virtual path to a real path for any
+   *  reason.
    *
    *  @param path A String specifying a virtual path (e.g. "/index.html").
    */
     public String getRealPath(String path){
-        return servletContext.getRealPath(path);
+
+
+      //Update currDir
+        String currDir = contextPath;
+        currDir = currDir.replace("\\","/");
+        if (!currDir.endsWith("/")){
+            currDir+="/";
+        }
+
+
+        path = path.replace("\\","/");
+
+
+        if (path.startsWith("/")){
+            return (currDir + path.substring(1)).replace("/", PathSeparator);
+        }
+
+
+        String[] arrRelPath = path.split("/");
+        String[] arrAbsPath = currDir.split("/");
+
+
+
+        int x = -1;
+        path = "";
+        String dir = "";
+        for (int i=0; i<arrRelPath.length; i++) {
+            dir = arrRelPath[i];
+            if (dir.equals("..")){
+                x = x + 1;
+            }
+            else if (dir.equals(".")){
+                //do nothing?
+            }
+            else{
+                path = path + "\\" + arrRelPath[i];
+            }
+        }
+
+
+        //x = x + 1 'because currDir has a "\" at the end of it
+        dir = "";
+        for (int i=0; i<arrAbsPath.length-(x+1); i++){ //because currDir has a "\" at the end of it
+            dir = dir + arrAbsPath[i] + "\\";
+        }
+
+
+        //trim off last "\"
+        dir = dir.substring(0, dir.length()-1);
+
+        //replace any leftover "/" characters
+        dir = dir + path.replace("/", "\\");
+
+
+        dir = dir.replace("\\", PathSeparator);
+
+        return dir;
     }
 
 
@@ -406,17 +466,17 @@ public class ServletContext {
   //** getServerInfo
   //**************************************************************************
   /** Returns the name and version of the servlet container on which
-   *  the servlet is running. The form of the returned string is 
-   *  <i>servername</i>/<i>versionnumber</i>. Example: 
+   *  the servlet is running. The form of the returned string is
+   *  <i>servername</i>/<i>versionnumber</i>. Example:
    *  <pre>JavaServer Web Dev Kit/1.0</pre>
    *  The servlet container may return other optional information after the
-   *  primary string, in parentheses. Example: 
-   *  <pre>JavaServer Web Dev Kit/1.0 (JDK 1.1.6; Windows NT 4.0 x86)</pre>
+   *  primary string, in parentheses. Example:
+   *  <pre>JavaXT Web Server/3.0</pre>
    */
     public String getServerInfo(){
         if (serverInfo!=null) return serverInfo;
         if (jarFile==null) jarFile = this.getJarFile();
-        
+
       //Parse the jar file and try to find the server version number
         try{
             java.util.jar.JarFile jar = new java.util.jar.JarFile(jarFile);
@@ -448,12 +508,12 @@ public class ServletContext {
   //**************************************************************************
   //** getInitParameter
   //**************************************************************************
-  /** Returns the value of the named context-wide initialization parameter, 
+  /** Returns the value of the named context-wide initialization parameter,
    *  or null if the parameter does not exist.
    *
    *  Initialization parameters are used to store configuration information
-   *  for an entire "web application".  For example, it can provide a 
-   *  webmaster's email address or the name of a system that holds critical 
+   *  for an entire "web application".  For example, it can provide a
+   *  webmaster's email address or the name of a system that holds critical
    *  data.
    */
     public String getInitParameter(String name){
@@ -465,7 +525,7 @@ public class ServletContext {
   //** getInitParameterNames
   //**************************************************************************
   /** Returns the names of the context's initialization parameters as an
-   *  Enumeration of String objects, or an empty Enumeration if the context 
+   *  Enumeration of String objects, or an empty Enumeration if the context
    *  has no initialization parameters.
    */
     public java.util.Enumeration<String> getInitParameterNames(){
@@ -476,10 +536,10 @@ public class ServletContext {
   //**************************************************************************
   //** getJarFile
   //**************************************************************************
-  /** Returns the jar file associated with the javaxt-server library. 
-   */    
+  /** Returns the jar file associated with the javaxt-server library.
+   */
     private java.io.File getJarFile(){
-    
+
         java.lang.Package Package = this.getClass().getPackage();
         String path = Package.getName().replace((CharSequence)".",(CharSequence)"/");
         String url = this.getClass().getClassLoader().getResource(path).toString();
@@ -493,7 +553,7 @@ public class ServletContext {
                   //Update Path and Define Zipped File
                     path = path.substring(path.indexOf("file:/"));
                     path = path.substring(0,path.toLowerCase().indexOf(".jar")+4);
-                    
+
                     if (path.startsWith("file://")){ //UNC Path
                         path = "C:/" + path.substring(path.indexOf("file:/")+7);
                         path = "/" + new java.net.URI(path).getPath();
@@ -501,7 +561,7 @@ public class ServletContext {
                     else{
                         path = new java.net.URI(path).getPath();
                     }
-                    return new java.io.File(path);                    
+                    return new java.io.File(path);
                 }
             }
             else{
