@@ -3,6 +3,7 @@ import java.security.KeyStore;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
+import org.eclipse.jetty.server.handler.AbstractHandler;
 
 //******************************************************************************
 //**  HttpServlet Class
@@ -66,6 +67,15 @@ public abstract class HttpServlet {
   //**************************************************************************
     public void setServletContext(ServletContext servletContext){
         this.servletContext = servletContext;
+
+      //Instantiate the WebSocketServer
+        if (servletContext.getAttribute("org.eclipse.jetty.server.Handler") instanceof AbstractHandler){
+            if (servletContext.getAttribute("javaxt.http.websocket.WebSocketServer")==null){
+                servletContext.setAttribute("javaxt.http.websocket.WebSocketServer",
+                    new javaxt.http.websocket.WebSocketServer(this)
+                );
+            }
+        }
     }
 
 

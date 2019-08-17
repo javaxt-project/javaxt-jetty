@@ -18,6 +18,7 @@ import javaxt.http.servlet.HttpServletRequest;
 import javaxt.http.servlet.HttpServletResponse;
 import javaxt.http.servlet.ServletContext;
 import javaxt.http.servlet.ServletException;
+import javaxt.http.websocket.WebSocketListener;
 
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
@@ -426,9 +427,7 @@ public class Server extends Thread {
 
 
           //Process websocket requests
-            /*
             if (request.isWebSocket()){
-
                 new WebSocketListener(request, response){
                     public void onConnect(){
                         send("Hello There!");
@@ -444,7 +443,6 @@ public class Server extends Thread {
                 };
                 return;
             }
-            */
 
 
           //Process form data
@@ -695,6 +693,8 @@ public class Server extends Thread {
 
           //Add reference to the baseRequest to the HttpServletRequest
             request.setAttribute("org.eclipse.jetty.server.Request", baseRequest);
+            request.setAttribute("javax.servlet.http.HttpServletRequest", request);
+            request.setAttribute("javax.servlet.http.HttpServletResponse", response);
 
 
           //Set session handler

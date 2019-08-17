@@ -28,6 +28,7 @@ public class HttpServletRequest {
 
     private java.net.URL url;
     private Boolean isKeepAlive;
+    private Boolean isWebSocket;
 
     private Authenticator authenticator;
     private boolean authenticate = true;
@@ -69,9 +70,6 @@ public class HttpServletRequest {
 
     }
 
-    protected javax.servlet.http.HttpServletRequest getBaseRequest(){
-        return request;
-    }
 
 
   //**************************************************************************
@@ -434,6 +432,28 @@ public class HttpServletRequest {
     }
 
 
+  //**************************************************************************
+  //** isWebSocket
+  //**************************************************************************
+  /** Used to determine whether the client is requesting a WebSocket
+   *  connection. Returns true if the Upgrade header contains a "websocket"
+   *  keyword and if the Connection header contains a "upgrade" keyword.
+   */
+    public boolean isWebSocket(){
+        if (isWebSocket==null){
+            isWebSocket = false;
+            Object obj = servletContext.getAttribute("javaxt.http.websocket.WebSocketServer");
+            if (obj!=null){
+                if (obj instanceof javaxt.http.websocket.WebSocketServer){
+                    javaxt.http.websocket.WebSocketServer ws = (javaxt.http.websocket.WebSocketServer) obj;
+                    isWebSocket = ws.accept(this);
+                }
+            }
+        }
+        return isWebSocket;
+    }
+
+
 //  //**************************************************************************
 //  //** isEncrypted
 //  //**************************************************************************
@@ -473,6 +493,8 @@ public class HttpServletRequest {
    */
     public String getScheme(){
         return request.getScheme();
+        //if (isWebSocket()) protocol = protocol.equals("https") ? "wss" : "ws";
+
         //return getURL().getProtocol().toLowerCase();
     }
 
@@ -1175,7 +1197,7 @@ public class HttpServletRequest {
   //**************************************************************************
   //** getServletContext
   //**************************************************************************
-    protected ServletContext getServletContext(){
+    public ServletContext getServletContext(){
         return this.servletContext;
     }
 
