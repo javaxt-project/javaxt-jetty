@@ -3,7 +3,6 @@ import java.io.IOException;
 import javaxt.http.servlet.Cookie;
 import javaxt.http.servlet.HttpServletRequest;
 import javaxt.http.servlet.HttpServletResponse;
-import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketAdapter;
 import org.eclipse.jetty.websocket.servlet.ServletUpgradeRequest;
@@ -15,32 +14,32 @@ import org.eclipse.jetty.websocket.servlet.ServletUpgradeRequest;
  *   Instances of this class are used to process WebSocket requests. Example:
  *
  <pre>
-    public class WebSocketTest extends HttpServlet {
+    public class MyServlet extends HttpServlet {
 
-        private WebSocketServer ws;
 
-        public WebSocketTest() {}
+        public MyServlet() {}
 
-        public void init(Object servletConfig) throws ServletException {
-            ws = new javaxt.http.servlet.WebSocketServer(this);
-        }
 
         public void processRequest(HttpServletRequest request, HttpServletResponse response)
         throws ServletException, java.io.IOException {
 
-            if (ws.accept(request)){
-                new WebSocketListener(ws, request, response){
+            if (request.isWebSocket()){
+                new WebSocketListener(request, response){
                     public void onConnect(){
                         send("Hello There!");
                     }
                     public void onText(String str){
+                        //System.out.println(str);
                         send("Message recieved at " + new java.util.Date());
+
                     }
-                    public void onDisconnect(int statusCode, String reason){
-                        send("Goodbye!");
+                    public void onDisconnect(int statusCode, String reason, boolean remote){
+                        //System.out.println("Goodbye...");
                     }
                 };
-                return;
+            }
+            else{ //standard http request
+                response.write("Hello, the time is now " + new java.util.Date());
             }
         }
     }
