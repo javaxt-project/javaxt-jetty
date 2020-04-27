@@ -761,16 +761,19 @@ public class Server extends Thread {
 
                 response.setStatus(e.getStatusCode());
                 response.setContentType("text/plain");
-                //response.write(e.getMessage());
+
 
                 String s = e.getClass().getName();
                 s = s.substring(s.lastIndexOf(".")+1);
                 String message = e.getLocalizedMessage();
-                String error = (message != null) ? (s + ": " + message) : s;
+                StringBuilder error = new StringBuilder((message != null) ? (s + ": " + message) : s);
                 for (StackTraceElement x : e.getStackTrace()){
-                    error+="\n"+x;
+                    String err = x.toString();
+                    if (err.trim().startsWith("org.eclipse.jetty")) break;
+                    error.append("\n");
+                    error.append(err);
                 }
-                response.write(error);
+                response.write(error.toString());
             }
             catch(Exception ex){
                 //TODO: Need to propgate error to the client!
