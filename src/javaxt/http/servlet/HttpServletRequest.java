@@ -654,8 +654,10 @@ public class HttpServletRequest {
    */
     public byte[] getBody() throws IOException {
 
-      //Only POST should have a body. Otherwise, return an empty array.
-        if (!this.getMethod().equals("POST")) return new byte[0];
+      //Only POST, PUT, AND DELETE should have a body. Otherwise, return an empty array.
+        String method = this.getMethod();
+        if (method.equals("POST") || method.equals("PUT") || method.equals("DELETE")){}
+        else return new byte[0];
 
 
       //If the client specified a Content-Length of 0, simply return an empty
