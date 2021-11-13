@@ -1,46 +1,5 @@
 /*
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
- *
- * Copyright (c) 1997-2013 Oracle and/or its affiliates. All rights reserved.
- *
- * The contents of this file are subject to the terms of either the GNU
- * General Public License Version 2 only ("GPL") or the Common Development
- * and Distribution License("CDDL") (collectively, the "License").  You
- * may not use this file except in compliance with the License.  You can
- * obtain a copy of the License at
- * https://glassfish.dev.java.net/public/CDDL+GPL_1_1.html
- * or packager/legal/LICENSE.txt.  See the License for the specific
- * language governing permissions and limitations under the License.
- *
- * When distributing the software, include this License Header Notice in each
- * file and include the License file at packager/legal/LICENSE.txt.
- *
- * GPL Classpath Exception:
- * Oracle designates this particular file as subject to the "Classpath"
- * exception as provided by Oracle in the GPL Version 2 section of the License
- * file that accompanied this code.
- *
- * Modifications:
- * If applicable, add the following below the License Header, with the fields
- * enclosed by brackets [] replaced by your own identifying information:
- * "Portions Copyright [year] [name of copyright owner]"
- *
- * Contributor(s):
- * If you wish your version of this file to be governed by only the CDDL or
- * only the GPL Version 2, indicate your decision by adding "[Contributor]
- * elects to include this software in this distribution under the [CDDL or GPL
- * Version 2] license."  If you don't indicate a single choice of license, a
- * recipient has the option to distribute your version of this file under
- * either the CDDL, the GPL Version 2 or to extend the choice of license to
- * its licensees as provided above.  However, if you add GPL Version 2 code
- * and therefore, elected the GPL Version 2 license, then the option applies
- * only if the new code is made subject to such option by the copyright
- * holder.
- *
- *
- * This file incorporates work covered by the following copyright and
- * permission notice:
- *
+ * Copyright (c) 1997-2018 Oracle and/or its affiliates. All rights reserved.
  * Copyright 2004 The Apache Software Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,6 +19,8 @@ package javax.servlet.http;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Map;
+import java.util.function.Supplier;
 import javax.servlet.ServletResponse;
 
 /**
@@ -161,6 +122,7 @@ public interface HttpServletResponse extends ServletResponse {
      * 			the unchanged URL otherwise.
      * @exception IllegalArgumentException if the url is not valid
      */
+    @Deprecated
     public String encodeUrl(String url);
     
     /**
@@ -172,20 +134,26 @@ public interface HttpServletResponse extends ServletResponse {
      * 			the unchanged URL otherwise.
      * @exception IllegalArgumentException if the url is not valid
      */
+    @Deprecated
     public String encodeRedirectUrl(String url);
 
     /**
-     * Sends an error response to the client using the specified
-     * status and clears the buffer.  The server defaults to creating the
-     * response to look like an HTML-formatted server error page
-     * containing the specified message, setting the content type
-     * to "text/html". The server will preserve cookies and may clear or
-     * update any headers needed to serve the error page as a valid response.
+     * <p>Sends an error response to the client using the specified
+     * status and clears the buffer.  The server defaults to creating
+     * the response to look like an HTML-formatted server error page
+     * containing the specified message, setting the content type to
+     * "text/html".  The caller is <strong>not</strong> responsible for
+     * escaping or re-encoding the message to ensure it is safe with
+     * respect to the current response encoding and content type.  This
+     * aspect of safety is the responsibility of the container, as it is
+     * generating the error page containing the message.  The server
+     * will preserve cookies and may clear or update any headers needed
+     * to serve the error page as a valid response.</p>
      *
-     * If an error-page declaration has been made for the web application
-     * corresponding to the status code passed in, it will be served back in 
-     * preference to the suggested msg parameter and the msg parameter will
-     * be ignored. 
+     * <p>If an error-page declaration has been made for the web
+     * application corresponding to the status code passed in, it will
+     * be served back in preference to the suggested msg parameter and
+     * the msg parameter will be ignored.</p>
      *
      * <p>If the response has already been committed, this method throws 
      * an IllegalStateException.
@@ -376,6 +344,7 @@ public interface HttpServletResponse extends ServletResponse {
      * @param	sc	the status code
      * @param	sm	the status message
      */
+    @Deprecated
     public void setStatus(int sc, String sm);
 
     /**
@@ -446,7 +415,56 @@ public interface HttpServletResponse extends ServletResponse {
      */
     public Collection<String> getHeaderNames();
 
-    
+    /**
+     * Sets the supplier of trailer headers.
+     *
+     * <p>The trailer header field value is defined as a comma-separated list
+     * (see Section 3.2.2 and Section 4.1.2 of RFC 7230).</p>
+     *
+     * <p>The supplier will be called within the scope of whatever thread/call
+     * causes the response content to be completed. Typically this will
+     * be any thread calling close() on the output stream or writer.</p>
+     *
+     * <p>The trailers that run afoul of the provisions of section 4.1.2 of
+     * RFC 7230 are ignored.</p>
+     *
+     * <p>The RFC requires the name of every key that is to be in the
+     * supplied Map is included in the comma separated list that is the value
+     * of the "Trailer" response header.  The application is responsible for
+     * ensuring this requirement is met.  Failure to do so may lead to
+     * interoperability failures.</p>
+     *
+     * @implSpec
+     * The default implementation is a no-op.
+     *
+     * @param supplier the supplier of trailer headers
+     *
+     * @exception IllegalStateException if it is invoked after the response has
+     *         has been committed,
+     *         or the trailer is not supported in the request, for instance,
+     *         the underlying protocol is HTTP 1.0, or the response is not
+     *         in chunked encoding in HTTP 1.1.
+     *
+     * @since Servlet 4.0
+     */
+    default public void setTrailerFields(Supplier<Map<String, String>> supplier) {
+    }
+
+    /**
+     * Gets the supplier of trailer headers.
+     *
+     * @implSpec
+     * The default implememtation return null.
+     *
+     * @return <code>Supplier</code> of trailer headers
+     * 
+     * @since Servlet 4.0
+     */
+    default public Supplier<Map<String, String>> getTrailerFields() {
+        return null;
+    }
+
+
     /*
      * Server status codes; see RFC 2068.
      */

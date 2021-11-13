@@ -255,22 +255,22 @@ public class Server extends Thread {
       //Configure logging
         Server.Log serverLog = new Server.Log();
         org.eclipse.jetty.util.log.Log.setLog(serverLog);
-        ConcurrentMap<String, Logger> loggers = org.eclipse.jetty.util.log.Log.getMutableLoggers();
-        synchronized(loggers){
-            java.util.ArrayList<String> keys = new java.util.ArrayList<>();
-            java.util.Iterator<String> it = loggers.keySet().iterator();
-            while (it.hasNext()){
-                String key = it.next();
-                Logger logger = loggers.get(key);
-                if (!(logger instanceof Server.Log)) keys.add(key);
-            }
-            if (!keys.isEmpty()){
-                for (String key : keys){
-                    loggers.put(key, serverLog);
-                }
-                loggers.notifyAll();
-            }
-        }
+//        ConcurrentMap<String, Logger> loggers = org.eclipse.jetty.util.log.Log.getMutableLoggers();
+//        synchronized(loggers){
+//            java.util.ArrayList<String> keys = new java.util.ArrayList<>();
+//            java.util.Iterator<String> it = loggers.keySet().iterator();
+//            while (it.hasNext()){
+//                String key = it.next();
+//                Logger logger = loggers.get(key);
+//                if (!(logger instanceof Server.Log)) keys.add(key);
+//            }
+//            if (!keys.isEmpty()){
+//                for (String key : keys){
+//                    loggers.put(key, serverLog);
+//                }
+//                loggers.notifyAll();
+//            }
+//        }
 
 
       //Configure server
@@ -447,6 +447,21 @@ public class Server extends Thread {
 
           //Process form data
             if (request.getMethod().equals("POST")){
+//                if (true){
+//                    java.io.File f = new java.io.File(dir + s + "uploads" + s + "test.txt");
+//                    byte[] bytes = request.getBody();
+//                    java.io.FileOutputStream output = null;
+//                    try {
+//                        f.getParentFile().mkdirs();
+//                        output = new java.io.FileOutputStream(f);
+//                        output.write(bytes);
+//                    }
+//                    catch (Exception e){}
+//                    finally {
+//                        try { if (output != null) output.close(); }
+//                        catch (Exception e){}
+//                    }
+//                }
                 boolean fileUploaded = false;
                 StringBuilder str = new StringBuilder();
                 java.util.Iterator<FormInput> it = request.getFormInputs();
@@ -1094,6 +1109,11 @@ public class Server extends Thread {
 
         @Override
         public SessionData load(String id) throws Exception {
+            return null;
+        }
+
+        @Override
+        public SessionData doLoad(String id) throws Exception{
             return null;
         }
 

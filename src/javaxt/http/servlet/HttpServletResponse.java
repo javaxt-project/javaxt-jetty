@@ -1190,6 +1190,7 @@ public class HttpServletResponse {
   //**************************************************************************
   /** @deprecated Use encodeURL(String url) instead
    */
+    @Deprecated
     public String encodeUrl(String url){
         return encodeURL(url);
     }
@@ -1199,6 +1200,7 @@ public class HttpServletResponse {
   //**************************************************************************
   /** @deprecated Use encodeRedirectURL(String url) instead
    */
+    @Deprecated
     public String encodeRedirectUrl(String url){
         return url;
     }

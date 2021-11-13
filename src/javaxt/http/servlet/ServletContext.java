@@ -18,7 +18,7 @@ public class ServletContext {
     private String serverInfo;
     private java.io.File jarFile;
     private javax.servlet.ServletContext servletContext;
-    
+
     public final String PathSeparator = System.getProperty("file.separator");
     private String contextPath = "";
 
@@ -319,6 +319,7 @@ public class ServletContext {
    *  Servlet API.
    *  @return null
    */
+    @Deprecated
     public Object getServlet(String name) throws ServletException{
         return null; //return Servlet
     }
@@ -332,6 +333,7 @@ public class ServletContext {
    *  Servlet API.
    *  @return null
    */
+    @Deprecated
     public java.util.Enumeration getServlets(){
         return null;
     }
@@ -345,6 +347,7 @@ public class ServletContext {
    *  Servlet API.
    *  @return null
    */
+    @Deprecated
     public java.util.Enumeration getServletNames(){
         return null;
     }
@@ -368,6 +371,7 @@ public class ServletContext {
    *  @deprecated As of Java Servlet API 2.1, use log(message, throwable)
    *  instead.
    */
+    @Deprecated
     public void log(Exception exception, String msg){
         //TODO: Implement logger
     }

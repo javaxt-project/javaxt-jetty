@@ -61,7 +61,7 @@ package javax.servlet;
 
 /**
  * Defines an exception that a servlet or filter throws to indicate
- * that it is permanently or temporarily unavailable. 
+ * that it is permanently or temporarily unavailable.
  *
  * <p>When a servlet or filter is permanently unavailable, something is wrong
  * with it, and it cannot handle
@@ -72,7 +72,7 @@ package javax.servlet;
  *
  * <p>A servlet or filter is temporarily unavailable if it cannot handle
  * requests momentarily due to some system-wide problem. For example,
- * a third-tier server might not be accessible, or there may be 
+ * a third-tier server might not be accessible, or there may be
  * insufficient memory or disk storage to handle requests. A system
  * administrator may need to take corrective action.
  *
@@ -96,9 +96,6 @@ extends ServletException {
     private int         seconds;           // unavailability estimate
 
     /**
-     * 
-     * @deprecated	As of Java Servlet API 2.2, use {@link
-     * 			#UnavailableException(String)} instead.
      *
      * @param servlet 	the <code>Servlet</code> instance that is
      *                  unavailable
@@ -113,24 +110,21 @@ extends ServletException {
 	this.servlet = servlet;
 	permanent = true;
     }
- 
+
     /**
-     * @deprecated	As of Java Servlet API 2.2, use {@link
-     *			#UnavailableException(String, int)} instead.
-     *
      * @param seconds	an integer specifying the number of seconds
      * 			the servlet expects to be unavailable; if
      *			zero or negative, indicates that the servlet
      *			can't make an estimate
      *
      * @param servlet	the <code>Servlet</code> that is unavailable
-     * 
-     * @param msg	a <code>String</code> specifying the descriptive 
-     *			message, which can be written to a log file or 
+     *
+     * @param msg	a <code>String</code> specifying the descriptive
+     *			message, which can be written to a log file or
      *			displayed for the user.
      *
      */
-    
+
     public UnavailableException(int seconds, Servlet servlet, String msg) {
 	super(msg);
 	this.servlet = servlet;
@@ -142,7 +136,7 @@ extends ServletException {
     }
 
     /**
-     * 
+     *
      * Constructs a new exception with a descriptive
      * message indicating that the servlet is permanently
      * unavailable.
@@ -162,7 +156,7 @@ extends ServletException {
      * Constructs a new exception with a descriptive message
      * indicating that the servlet is temporarily unavailable
      * and giving an estimate of how long it will be unavailable.
-     * 
+     *
      * <p>In some cases, the servlet cannot make an estimate. For
      * example, the servlet might know that a server it needs is
      * not running, but not be able to report how long it will take
@@ -179,7 +173,7 @@ extends ServletException {
      *			can't make an estimate
      *
      */
-    
+
     public UnavailableException(String msg, int seconds) {
 	super(msg);
 
@@ -204,28 +198,26 @@ extends ServletException {
      *			unavailable
      *
      */
-     
+
     public boolean isPermanent() {
 	return permanent;
     }
-  
+
     /**
-     * @deprecated	As of Java Servlet API 2.2, with no replacement.
-     *
      * Returns the servlet that is reporting its unavailability.
-     * 
-     * @return		the <code>Servlet</code> object that is 
+     *
+     * @return		the <code>Servlet</code> object that is
      *			throwing the <code>UnavailableException</code>
      *
      */
-     
+
     public Servlet getServlet() {
 	return servlet;
     }
 
     /**
-     * Returns the number of seconds the servlet expects to 
-     * be temporarily unavailable.  
+     * Returns the number of seconds the servlet expects to
+     * be temporarily unavailable.
      *
      * <p>If this method returns a negative number, the servlet
      * is permanently unavailable or cannot provide an estimate of
@@ -239,7 +231,7 @@ extends ServletException {
      *			unavailable or cannot make an estimate
      *
      */
-     
+
     public int getUnavailableSeconds() {
 	return permanent ? -1 : seconds;
     }

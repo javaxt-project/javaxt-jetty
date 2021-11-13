@@ -44,6 +44,7 @@ import org.eclipse.jetty.websocket.common.LogicalConnection;
 import org.eclipse.jetty.websocket.common.SessionFactory;
 import org.eclipse.jetty.websocket.common.WebSocketSession;
 import org.eclipse.jetty.websocket.common.WebSocketSessionFactory;
+import org.eclipse.jetty.websocket.common.WebSocketSessionListener;
 import org.eclipse.jetty.websocket.common.events.EventDriver;
 import org.eclipse.jetty.websocket.common.events.EventDriverFactory;
 import org.eclipse.jetty.websocket.common.extensions.ExtensionStack;
@@ -147,7 +148,7 @@ public class WebSocketServer {
 
         private final Map<Integer, WebSocketHandshake> handshakes = new HashMap<>();
         private final Scheduler scheduler = new ScheduledExecutorScheduler();
-        private final List<WebSocketSession.Listener> listeners = new CopyOnWriteArrayList<>();
+        private final List<WebSocketSessionListener> listeners = new CopyOnWriteArrayList<>();
         private final String supportedVersions;
         private final WebSocketPolicy policy;
         private final EventDriverFactory eventDriverFactory;
@@ -175,7 +176,7 @@ public class WebSocketServer {
 
 
 
-            this.eventDriverFactory = new EventDriverFactory(policy);
+            this.eventDriverFactory = new EventDriverFactory(this);
             this.extensionFactory = new WebSocketExtensionFactory(this);
             this.sessionFactories.add(new WebSocketSessionFactory(this));
 
@@ -200,343 +201,361 @@ public class WebSocketServer {
         }
 
 
-    private WebSocketSession createSession(URI requestURI, EventDriver websocket, LogicalConnection connection)
-    {
-        if (websocket == null)
+        @Override
+        public void addSessionListener(WebSocketSessionListener listener)
         {
-            throw new InvalidWebSocketException("Unable to create Session from null websocket");
+            this.listeners.add(listener);
         }
 
-        for (SessionFactory impl : sessionFactories)
+        @Override
+        public void removeSessionListener(WebSocketSessionListener listener)
         {
-            if (impl.supports(websocket))
+            this.listeners.remove(listener);
+        }
+
+        @Override
+        public Collection<WebSocketSessionListener> getSessionListeners()
+        {
+            return this.listeners;
+        }
+
+        private WebSocketSession createSession(URI requestURI, EventDriver websocket, LogicalConnection connection)
+        {
+            if (websocket == null)
+            {
+                throw new InvalidWebSocketException("Unable to create Session from null websocket");
+            }
+
+            for (SessionFactory impl : sessionFactories)
+            {
+                if (impl.supports(websocket))
+                {
+                    try
+                    {
+                        return impl.createSession(requestURI, websocket, connection);
+                    }
+                    catch (Throwable e)
+                    {
+                        throw new InvalidWebSocketException("Unable to create Session", e);
+                    }
+                }
+            }
+
+            throw new InvalidWebSocketException("Unable to create Session: unrecognized internal EventDriver type: " + websocket.getClass().getName());
+        }
+
+
+        @Override
+        protected void doStart() throws Exception
+        {
+
+            if(this.objectFactory == null && context != null)
+            {
+                this.objectFactory = (DecoratedObjectFactory) context.getAttribute(DecoratedObjectFactory.ATTR);
+                if (this.objectFactory == null)
+                {
+                    throw new IllegalStateException("Unable to find required ServletContext attribute: " + DecoratedObjectFactory.ATTR);
+                }
+            }
+
+            if(this.executor == null && context != null)
+            {
+                ContextHandler contextHandler = ContextHandler.getContextHandler(context);
+                this.executor = contextHandler.getServer().getThreadPool();
+            }
+
+            Objects.requireNonNull(this.objectFactory, DecoratedObjectFactory.class.getName());
+            Objects.requireNonNull(this.executor, Executor.class.getName());
+
+            super.doStart();
+        }
+
+        @Override
+        public ByteBufferPool getBufferPool()
+        {
+            return this.bufferPool;
+        }
+
+
+        @Override
+        public Executor getExecutor()
+        {
+            return this.executor;
+        }
+
+        @Override
+        public DecoratedObjectFactory getObjectFactory()
+        {
+            return objectFactory;
+        }
+
+        protected EventDriverFactory getEventDriverFactory()
+        {
+            return eventDriverFactory;
+        }
+
+
+
+        protected Collection<WebSocketSession> getOpenSessions()
+        {
+            return getBeans(WebSocketSession.class);
+        }
+
+        @Override
+        public WebSocketPolicy getPolicy()
+        {
+            return policy;
+        }
+
+        @Override
+        public SslContextFactory getSslContextFactory()
+        {
+            /* Not relevant for a Server, as this is defined in the
+             * Connector configuration
+             */
+            return null;
+        }
+
+        //@Override
+        private boolean isUpgradeRequest(HttpServletRequest request)
+        {
+            // Tests sorted by least common to most common.
+
+            String upgrade = request.getHeader("Upgrade");
+            if (upgrade == null)
+            {
+                // no "Upgrade: websocket" header present.
+                return false;
+            }
+
+            if (!"websocket".equalsIgnoreCase(upgrade))
+            {
+                // Not a websocket upgrade
+                return false;
+            }
+
+            String connection = request.getHeader("Connection");
+            if (connection == null)
+            {
+                // no "Connection: upgrade" header present.
+                return false;
+            }
+
+            // Test for "Upgrade" token
+            boolean foundUpgradeToken = false;
+            Iterator<String> iter = QuoteUtil.splitAt(connection, ",");
+            while (iter.hasNext())
+            {
+                String token = iter.next();
+                if ("upgrade".equalsIgnoreCase(token))
+                {
+                    foundUpgradeToken = true;
+                    break;
+                }
+            }
+
+            if (!foundUpgradeToken)
+            {
+                return false;
+            }
+
+            if (!"GET".equalsIgnoreCase(request.getMethod()))
+            {
+                // not a "GET" request (not a websocket upgrade)
+                return false;
+            }
+
+            if (!"HTTP/1.1".equals(request.getProtocol()))
+            {
+                LOG.debug("Not a 'HTTP/1.1' request (was [" + request.getProtocol() + "])");
+                return false;
+            }
+
+            return true;
+        }
+
+//        @Override
+//        public void onSessionOpened(WebSocketSession session)
+//        {
+//            addManaged(session);
+//            notifySessionListeners(listener -> listener.onOpened(session));
+//        }
+//
+//        @Override
+//        public void onSessionClosed(WebSocketSession session)
+//        {
+//            removeBean(session);
+//            notifySessionListeners(listener -> listener.onClosed(session));
+//        }
+
+        private void notifySessionListeners(Consumer<WebSocketSessionListener> consumer)
+        {
+            for (WebSocketSessionListener listener : listeners)
             {
                 try
                 {
-                    return impl.createSession(requestURI, websocket, connection);
+                    consumer.accept(listener);
                 }
-                catch (Throwable e)
+                catch (Throwable x)
                 {
-                    throw new InvalidWebSocketException("Unable to create Session", e);
+                    LOG.info("Exception while invoking listener " + listener, x);
                 }
             }
         }
 
-        throw new InvalidWebSocketException("Unable to create Session: unrecognized internal EventDriver type: " + websocket.getClass().getName());
-    }
 
-
-    @Override
-    protected void doStart() throws Exception
-    {
-
-        if(this.objectFactory == null && context != null)
-        {
-            this.objectFactory = (DecoratedObjectFactory) context.getAttribute(DecoratedObjectFactory.ATTR);
-            if (this.objectFactory == null)
-            {
-                throw new IllegalStateException("Unable to find required ServletContext attribute: " + DecoratedObjectFactory.ATTR);
-            }
-        }
-
-        if(this.executor == null && context != null)
-        {
-            ContextHandler contextHandler = ContextHandler.getContextHandler(context);
-            this.executor = contextHandler.getServer().getThreadPool();
-        }
-
-        Objects.requireNonNull(this.objectFactory, DecoratedObjectFactory.class.getName());
-        Objects.requireNonNull(this.executor, Executor.class.getName());
-
-        super.doStart();
-    }
-
-    @Override
-    public ByteBufferPool getBufferPool()
-    {
-        return this.bufferPool;
-    }
-
-
-    @Override
-    public Executor getExecutor()
-    {
-        return this.executor;
-    }
-
-    @Override
-    public DecoratedObjectFactory getObjectFactory()
-    {
-        return objectFactory;
-    }
-
-    protected EventDriverFactory getEventDriverFactory()
-    {
-        return eventDriverFactory;
-    }
-
-
-
-    protected Collection<WebSocketSession> getOpenSessions()
-    {
-        return getBeans(WebSocketSession.class);
-    }
-
-    @Override
-    public WebSocketPolicy getPolicy()
-    {
-        return policy;
-    }
-
-    @Override
-    public SslContextFactory getSslContextFactory()
-    {
-        /* Not relevant for a Server, as this is defined in the
-         * Connector configuration
+        /**
+         * Upgrade the request/response to a WebSocket Connection.
+         * <p/>
+         * This method will not normally return, but will instead throw a UpgradeConnectionException, to exit HTTP handling and initiate WebSocket handling of the
+         * connection.
+         *
+         * @param http the raw http connection
+         * @param request The request to upgrade
+         * @param response The response to upgrade
+         * @param driver The websocket handler implementation to use
          */
-        return null;
-    }
-
-    //@Override
-    private boolean isUpgradeRequest(HttpServletRequest request)
-    {
-        // Tests sorted by least common to most common.
-
-        String upgrade = request.getHeader("Upgrade");
-        if (upgrade == null)
+        private boolean upgrade(HttpConnection http, ServletUpgradeRequest request, ServletUpgradeResponse response, EventDriver driver) throws IOException
         {
-            // no "Upgrade: websocket" header present.
-            return false;
-        }
-
-        if (!"websocket".equalsIgnoreCase(upgrade))
-        {
-            // Not a websocket upgrade
-            return false;
-        }
-
-        String connection = request.getHeader("Connection");
-        if (connection == null)
-        {
-            // no "Connection: upgrade" header present.
-            return false;
-        }
-
-        // Test for "Upgrade" token
-        boolean foundUpgradeToken = false;
-        Iterator<String> iter = QuoteUtil.splitAt(connection, ",");
-        while (iter.hasNext())
-        {
-            String token = iter.next();
-            if ("upgrade".equalsIgnoreCase(token))
+            if (!"websocket".equalsIgnoreCase(request.getHeader("Upgrade")))
             {
-                foundUpgradeToken = true;
-                break;
+                throw new IllegalStateException("Not a 'WebSocket: Upgrade' request");
             }
-        }
-
-        if (!foundUpgradeToken)
-        {
-            return false;
-        }
-
-        if (!"GET".equalsIgnoreCase(request.getMethod()))
-        {
-            // not a "GET" request (not a websocket upgrade)
-            return false;
-        }
-
-        if (!"HTTP/1.1".equals(request.getProtocol()))
-        {
-            LOG.debug("Not a 'HTTP/1.1' request (was [" + request.getProtocol() + "])");
-            return false;
-        }
-
-        return true;
-    }
-
-    @Override
-    public void onSessionOpened(WebSocketSession session)
-    {
-        addManaged(session);
-        notifySessionListeners(listener -> listener.onOpened(session));
-    }
-
-    @Override
-    public void onSessionClosed(WebSocketSession session)
-    {
-        removeBean(session);
-        notifySessionListeners(listener -> listener.onClosed(session));
-    }
-
-    private void notifySessionListeners(Consumer<WebSocketSession.Listener> consumer)
-    {
-        for (WebSocketSession.Listener listener : listeners)
-        {
-            try
+            if (!"HTTP/1.1".equals(request.getHttpVersion()))
             {
-                consumer.accept(listener);
+                throw new IllegalStateException("Not a 'HTTP/1.1' request");
             }
-            catch (Throwable x)
+
+            int version = request.getHeaderInt("Sec-WebSocket-Version");
+            if (version < 0)
             {
-                LOG.info("Exception while invoking listener " + listener, x);
+                // Old pre-RFC version specifications (header not present in RFC-6455)
+                version = request.getHeaderInt("Sec-WebSocket-Draft");
             }
-        }
-    }
 
-
-    /**
-     * Upgrade the request/response to a WebSocket Connection.
-     * <p/>
-     * This method will not normally return, but will instead throw a UpgradeConnectionException, to exit HTTP handling and initiate WebSocket handling of the
-     * connection.
-     *
-     * @param http the raw http connection
-     * @param request The request to upgrade
-     * @param response The response to upgrade
-     * @param driver The websocket handler implementation to use
-     */
-    private boolean upgrade(HttpConnection http, ServletUpgradeRequest request, ServletUpgradeResponse response, EventDriver driver) throws IOException
-    {
-        if (!"websocket".equalsIgnoreCase(request.getHeader("Upgrade")))
-        {
-            throw new IllegalStateException("Not a 'WebSocket: Upgrade' request");
-        }
-        if (!"HTTP/1.1".equals(request.getHttpVersion()))
-        {
-            throw new IllegalStateException("Not a 'HTTP/1.1' request");
-        }
-
-        int version = request.getHeaderInt("Sec-WebSocket-Version");
-        if (version < 0)
-        {
-            // Old pre-RFC version specifications (header not present in RFC-6455)
-            version = request.getHeaderInt("Sec-WebSocket-Draft");
-        }
-
-        WebSocketHandshake handshaker = handshakes.get(version);
-        if (handshaker == null)
-        {
-            StringBuilder warn = new StringBuilder();
-            warn.append("Client ").append(request.getRemoteAddress());
-            warn.append(" (:").append(request.getRemotePort());
-            warn.append(") User Agent: ");
-            String ua = request.getHeader("User-Agent");
-            if (ua == null)
+            WebSocketHandshake handshaker = handshakes.get(version);
+            if (handshaker == null)
             {
-                warn.append("[unset] ");
+                StringBuilder warn = new StringBuilder();
+                warn.append("Client ").append(request.getRemoteAddress());
+                warn.append(" (:").append(request.getRemotePort());
+                warn.append(") User Agent: ");
+                String ua = request.getHeader("User-Agent");
+                if (ua == null)
+                {
+                    warn.append("[unset] ");
+                }
+                else
+                {
+                    warn.append('"').append(StringUtil.sanitizeXmlString(ua)).append("\" ");
+                }
+                warn.append("requested WebSocket version [").append(version);
+                warn.append("], Jetty supports version");
+                if (handshakes.size() > 1)
+                {
+                    warn.append('s');
+                }
+                warn.append(": [").append(supportedVersions).append("]");
+                LOG.warn(warn.toString());
+
+                // Per RFC 6455 - 4.4 - Supporting Multiple Versions of WebSocket Protocol
+                // Using the examples as outlined
+                response.setHeader("Sec-WebSocket-Version", supportedVersions);
+                response.sendError(HttpStatus.BAD_REQUEST_400, "Unsupported websocket version specification");
+                return false;
+            }
+
+            // Initialize / Negotiate Extensions
+            ExtensionStack extensionStack = new ExtensionStack(extensionFactory);
+            // The JSR allows for the extensions to be pre-negotiated, filtered, etc...
+            // Usually from a Configurator.
+            if (response.isExtensionsNegotiated())
+            {
+                // Use pre-negotiated extension list from response
+                extensionStack.negotiate(response.getExtensions());
             }
             else
             {
-                warn.append('"').append(StringUtil.sanitizeXmlString(ua)).append("\" ");
+                // Use raw extension list from request
+                extensionStack.negotiate(request.getExtensions());
             }
-            warn.append("requested WebSocket version [").append(version);
-            warn.append("], Jetty supports version");
-            if (handshakes.size() > 1)
+
+            // Get original HTTP connection
+            EndPoint endp = http.getEndPoint();
+            Connector connector = http.getConnector();
+
+
+            // Setup websocket connection
+            AbstractWebSocketConnection wsConnection = new WebSocketServerConnection(
+                endp, connector.getExecutor(), scheduler, driver.getPolicy(), connector.getByteBufferPool()
+            );
+
+            extensionStack.setPolicy(driver.getPolicy());
+            extensionStack.configure(wsConnection.getParser());
+            extensionStack.configure(wsConnection.getGenerator());
+
+            if (LOG.isDebugEnabled())
             {
-                warn.append('s');
+                LOG.debug("HttpConnection: {}", http);
+                LOG.debug("WebSocketConnection: {}", wsConnection);
             }
-            warn.append(": [").append(supportedVersions).append("]");
-            LOG.warn(warn.toString());
 
-            // Per RFC 6455 - 4.4 - Supporting Multiple Versions of WebSocket Protocol
-            // Using the examples as outlined
-            response.setHeader("Sec-WebSocket-Version", supportedVersions);
-            response.sendError(HttpStatus.BAD_REQUEST_400, "Unsupported websocket version specification");
+            // Setup Session
+            WebSocketSession session = createSession(request.getRequestURI(), driver, wsConnection);
+            session.setUpgradeRequest(request);
+            // set true negotiated extension list back to response
+            response.setExtensions(extensionStack.getNegotiatedExtensions());
+            session.setUpgradeResponse(response);
+            wsConnection.addListener(session);
+
+            // Setup Incoming Routing
+            wsConnection.setNextIncomingFrames(extensionStack);
+            extensionStack.setNextIncoming(session);
+
+            // Setup Outgoing Routing
+            session.setOutgoingHandler(extensionStack);
+            extensionStack.setNextOutgoing(wsConnection);
+
+            // Start Components
+            session.addManaged(extensionStack);
+            this.addManaged(session);
+
+            if (session.isFailed())
+            {
+                throw new IOException("Session failed to start");
+            }
+
+            // Tell jetty about the new upgraded connection
+            request.setServletAttribute(HttpConnection.UPGRADE_CONNECTION_ATTRIBUTE, wsConnection);
+
+            if (LOG.isDebugEnabled())
+                LOG.debug("Handshake Response: {}", handshaker);
+
+            if (getSendServerVersion(connector))
+                response.setHeader("Server", HttpConfiguration.SERVER_VERSION);
+
+            // Process (version specific) handshake response
+            handshaker.doHandshakeResponse(request, response);
+
+            if (LOG.isDebugEnabled())
+                LOG.debug("Websocket upgrade {} {} {} {}", request.getRequestURI(), version, response.getAcceptedSubProtocol(), wsConnection);
+
+            return true;
+        }
+
+        private boolean getSendServerVersion(Connector connector)
+        {
+            ConnectionFactory connFactory = connector.getConnectionFactory(HttpVersion.HTTP_1_1.asString());
+            if (connFactory == null)
+                return false;
+
+            if (connFactory instanceof HttpConnectionFactory)
+            {
+                HttpConfiguration httpConf = ((HttpConnectionFactory) connFactory).getHttpConfiguration();
+                if (httpConf != null)
+                    return httpConf.getSendServerVersion();
+            }
             return false;
         }
-
-        // Initialize / Negotiate Extensions
-        ExtensionStack extensionStack = new ExtensionStack(extensionFactory);
-        // The JSR allows for the extensions to be pre-negotiated, filtered, etc...
-        // Usually from a Configurator.
-        if (response.isExtensionsNegotiated())
-        {
-            // Use pre-negotiated extension list from response
-            extensionStack.negotiate(response.getExtensions());
-        }
-        else
-        {
-            // Use raw extension list from request
-            extensionStack.negotiate(request.getExtensions());
-        }
-
-        // Get original HTTP connection
-        EndPoint endp = http.getEndPoint();
-        Connector connector = http.getConnector();
-
-
-        // Setup websocket connection
-        AbstractWebSocketConnection wsConnection = new WebSocketServerConnection(
-            endp, connector.getExecutor(), scheduler, driver.getPolicy(), connector.getByteBufferPool()
-        );
-
-        extensionStack.setPolicy(driver.getPolicy());
-        extensionStack.configure(wsConnection.getParser());
-        extensionStack.configure(wsConnection.getGenerator());
-
-        if (LOG.isDebugEnabled())
-        {
-            LOG.debug("HttpConnection: {}", http);
-            LOG.debug("WebSocketConnection: {}", wsConnection);
-        }
-
-        // Setup Session
-        WebSocketSession session = createSession(request.getRequestURI(), driver, wsConnection);
-        session.setUpgradeRequest(request);
-        // set true negotiated extension list back to response
-        response.setExtensions(extensionStack.getNegotiatedExtensions());
-        session.setUpgradeResponse(response);
-        wsConnection.addListener(session);
-
-        // Setup Incoming Routing
-        wsConnection.setNextIncomingFrames(extensionStack);
-        extensionStack.setNextIncoming(session);
-
-        // Setup Outgoing Routing
-        session.setOutgoingHandler(extensionStack);
-        extensionStack.setNextOutgoing(wsConnection);
-
-        // Start Components
-        session.addManaged(extensionStack);
-        this.addManaged(session);
-
-        if (session.isFailed())
-        {
-            throw new IOException("Session failed to start");
-        }
-
-        // Tell jetty about the new upgraded connection
-        request.setServletAttribute(HttpConnection.UPGRADE_CONNECTION_ATTRIBUTE, wsConnection);
-
-        if (LOG.isDebugEnabled())
-            LOG.debug("Handshake Response: {}", handshaker);
-
-        if (getSendServerVersion(connector))
-            response.setHeader("Server", HttpConfiguration.SERVER_VERSION);
-
-        // Process (version specific) handshake response
-        handshaker.doHandshakeResponse(request, response);
-
-        if (LOG.isDebugEnabled())
-            LOG.debug("Websocket upgrade {} {} {} {}", request.getRequestURI(), version, response.getAcceptedSubProtocol(), wsConnection);
-
-        return true;
     }
-
-    private boolean getSendServerVersion(Connector connector)
-    {
-        ConnectionFactory connFactory = connector.getConnectionFactory(HttpVersion.HTTP_1_1.asString());
-        if (connFactory == null)
-            return false;
-
-        if (connFactory instanceof HttpConnectionFactory)
-        {
-            HttpConfiguration httpConf = ((HttpConnectionFactory) connFactory).getHttpConfiguration();
-            if (httpConf != null)
-                return httpConf.getSendServerVersion();
-        }
-        return false;
-    }
-}
 }

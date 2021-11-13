@@ -81,12 +81,12 @@ public class ServletRequestWrapper implements ServletRequest {
     private ServletRequest request;
 
     /**
-     * Creates a ServletRequest adaptor wrapping the given request object. 
+     * Creates a ServletRequest adaptor wrapping the given request object.
      * @throws java.lang.IllegalArgumentException if the request is null
      */
     public ServletRequestWrapper(ServletRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("Request cannot be null");   
+            throw new IllegalArgumentException("Request cannot be null");
         }
         this.request = request;
     }
@@ -101,7 +101,7 @@ public class ServletRequestWrapper implements ServletRequest {
 
 
     /**
-     * Sets the request object being wrapped. 
+     * Sets the request object being wrapped.
      * @throws java.lang.IllegalArgumentException if the request is null.
      */
     public void setRequest(ServletRequest request) {
@@ -127,7 +127,7 @@ public class ServletRequestWrapper implements ServletRequest {
      */
     public Enumeration<String> getAttributeNames() {
         return this.request.getAttributeNames();
-    }    
+    }
 
 
     /**
@@ -342,21 +342,19 @@ public class ServletRequestWrapper implements ServletRequest {
     /**
      * The default behavior of this method is to return
      * getRealPath(String path) on the wrapped request object.
-     *
-     * @deprecated As of Version 2.1 of the Java Servlet API,
-     * use {@link ServletContext#getRealPath} instead
+
      */
     public String getRealPath(String path) {
         return this.request.getRealPath(path);
     }
 
-    
+
     /**
      * The default behavior of this method is to return
      * getRemotePort() on the wrapped request object.
      *
      * @since Servlet 2.4
-     */    
+     */
     public int getRemotePort(){
         return this.request.getRemotePort();
     }
@@ -378,7 +376,7 @@ public class ServletRequestWrapper implements ServletRequest {
      * getLocalAddr() on the wrapped request object.
      *
      * @since Servlet 2.4
-     */       
+     */
     public String getLocalAddr(){
         return this.request.getLocalAddr();
     }
@@ -414,7 +412,7 @@ public class ServletRequestWrapper implements ServletRequest {
      * {@link ServletRequest#startAsync} on the wrapped request object.
      *
      * @return the (re)initialized AsyncContext
-     * 
+     *
      * @throws IllegalStateException if the request is within the scope of
      * a filter or servlet that does not support asynchronous operations
      * (that is, {@link #isAsyncSupported} returns false),
@@ -431,7 +429,7 @@ public class ServletRequestWrapper implements ServletRequest {
     public AsyncContext startAsync() throws IllegalStateException {
         return request.startAsync();
     }
-    
+
 
     /**
      * The default behavior of this method is to invoke
@@ -504,9 +502,9 @@ public class ServletRequestWrapper implements ServletRequest {
      * @return the AsyncContext that was created or reinitialized by the
      * most recent invocation of {@link #startAsync} or
      * {@link #startAsync(ServletRequest,ServletResponse)} on
-     * the wrapped request 
+     * the wrapped request
      *
-     * @throws IllegalStateException if this request has not been put 
+     * @throws IllegalStateException if this request has not been put
      * into asynchronous mode, i.e., if neither {@link #startAsync} nor
      * {@link #startAsync(ServletRequest,ServletResponse)} has been called
      *
@@ -576,7 +574,7 @@ public class ServletRequestWrapper implements ServletRequest {
      * Gets the dispatcher type of the wrapped request.
      *
      * @return the dispatcher type of the wrapped request
-     * 
+     *
      * @see ServletRequest#getDispatcherType
      *
      * @since Servlet 3.0

@@ -1,6 +1,6 @@
 //
 //  ========================================================================
-//  Copyright (c) 1995-2016 Mort Bay Consulting Pty. Ltd.
+//  Copyright (c) 1995-2021 Mort Bay Consulting Pty Ltd and others.
 //  ------------------------------------------------------------------------
 //  All rights reserved. This program and the accompanying materials
 //  are made available under the terms of the Eclipse Public License v1.0
@@ -24,6 +24,7 @@ import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.thread.ExecutionStrategy;
 import org.eclipse.jetty.util.thread.Invocable;
+import org.eclipse.jetty.util.thread.Invocable.InvocationType;
 import org.eclipse.jetty.util.thread.Locker;
 import org.eclipse.jetty.util.thread.Locker.Lock;
 
@@ -31,23 +32,19 @@ import org.eclipse.jetty.util.thread.Locker.Lock;
  * <p>A strategy where the caller thread iterates over task production, submitting each
  * task to an {@link Executor} for execution.</p>
  */
-public class ProduceExecuteConsume extends ExecutingExecutionStrategy implements ExecutionStrategy
+public class ProduceExecuteConsume implements ExecutionStrategy
 {
     private static final Logger LOG = Log.getLogger(ProduceExecuteConsume.class);
 
     private final Locker _locker = new Locker();
     private final Producer _producer;
+    private final Executor _executor;
     private State _state = State.IDLE;
 
     public ProduceExecuteConsume(Producer producer, Executor executor)
     {
-        this(producer,executor,Invocable.InvocationType.NON_BLOCKING);
-    }
-    
-    public ProduceExecuteConsume(Producer producer, Executor executor, Invocable.InvocationType preferred)
-    {
-        super(executor,preferred);
-        this._producer = producer;
+        _producer = producer;
+        _executor = executor;
     }
 
     @Override
@@ -55,15 +52,15 @@ public class ProduceExecuteConsume extends ExecutingExecutionStrategy implements
     {
         try (Lock locked = _locker.lock())
         {
-            switch(_state)
+            switch (_state)
             {
                 case IDLE:
-                    _state=State.PRODUCE;
+                    _state = State.PRODUCE;
                     break;
 
                 case PRODUCE:
                 case EXECUTE:
-                    _state=State.EXECUTE;
+                    _state = State.EXECUTE;
                     return;
             }
         }
@@ -80,38 +77,32 @@ public class ProduceExecuteConsume extends ExecutingExecutionStrategy implements
             {
                 try (Lock locked = _locker.lock())
                 {
-                    switch(_state)
+                    switch (_state)
                     {
                         case IDLE:
                             throw new IllegalStateException();
                         case PRODUCE:
-                            _state=State.IDLE;
+                            _state = State.IDLE;
                             return;
                         case EXECUTE:
-                            _state=State.PRODUCE;
+                            _state = State.PRODUCE;
                             continue;
                     }
                 }
             }
 
             // Execute the task.
-            execute(task);
-        }        
+            if (Invocable.getInvocationType(task) == InvocationType.NON_BLOCKING)
+                task.run();
+            else
+                _executor.execute(task);
+        }
     }
 
     @Override
     public void dispatch()
     {
-        produce();
-    }
-
-    public static class Factory implements ExecutionStrategy.Factory
-    {
-        @Override
-        public ExecutionStrategy newExecutionStrategy(Producer producer, Executor executor)
-        {
-            return new ProduceExecuteConsume(producer, executor);
-        }
+        _executor.execute(() -> produce());
     }
 
     private enum State

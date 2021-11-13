@@ -1,6 +1,6 @@
 //
 //  ========================================================================
-//  Copyright (c) 1995-2016 Mort Bay Consulting Pty. Ltd.
+//  Copyright (c) 1995-2021 Mort Bay Consulting Pty Ltd and others.
 //  ------------------------------------------------------------------------
 //  All rights reserved. This program and the accompanying materials
 //  are made available under the terms of the Eclipse Public License v1.0
@@ -20,11 +20,9 @@ package org.eclipse.jetty.server;
 
 import java.io.IOException;
 import java.net.URLClassLoader;
-import java.util.Collections;
 
-import org.eclipse.jetty.util.TypeUtil;
-import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.component.Dumpable;
+import org.eclipse.jetty.util.component.DumpableCollection;
 
 public class ClassLoaderDump implements Dumpable
 {
@@ -38,26 +36,44 @@ public class ClassLoaderDump implements Dumpable
     @Override
     public String dump()
     {
-        return ContainerLifeCycle.dump(this);
+        return Dumpable.dump(this);
     }
 
     @Override
     public void dump(Appendable out, String indent) throws IOException
     {
-        if (_loader==null)
+        if (_loader == null)
             out.append("No ClassLoader\n");
+        else if (_loader instanceof Dumpable)
+        {
+            ((Dumpable)_loader).dump(out, indent);
+        }
+        else if (_loader instanceof URLClassLoader)
+        {
+            String loader = _loader.toString();
+            DumpableCollection urls = DumpableCollection.fromArray("URLs", ((URLClassLoader)_loader).getURLs());
+            ClassLoader parent = _loader.getParent();
+            if (parent == null)
+                Dumpable.dumpObjects(out, indent, loader, urls);
+            else if (parent == Server.class.getClassLoader())
+                Dumpable.dumpObjects(out, indent, loader, urls, parent.toString());
+            else if (parent instanceof Dumpable)
+                Dumpable.dumpObjects(out, indent, loader, urls, parent);
+            else
+                Dumpable.dumpObjects(out, indent, loader, urls, new ClassLoaderDump(parent));
+        }
         else
         {
-            out.append(String.valueOf(_loader)).append("\n");
-
-            Object parent = _loader.getParent();
-            if (parent != null)
-            {
-                if (_loader instanceof URLClassLoader)
-                    ContainerLifeCycle.dump(out,indent,TypeUtil.asList(((URLClassLoader)_loader).getURLs()),Collections.singleton(parent.toString()));
-                else
-                    ContainerLifeCycle.dump(out,indent,Collections.singleton(parent.toString()));
-            }
+            String loader = _loader.toString();
+            ClassLoader parent = _loader.getParent();
+            if (parent == null)
+                Dumpable.dumpObject(out, loader);
+            if (parent == Server.class.getClassLoader())
+                Dumpable.dumpObjects(out, indent, loader, parent.toString());
+            else if (parent instanceof Dumpable)
+                Dumpable.dumpObjects(out, indent, loader, parent);
+            else if (parent != null)
+                Dumpable.dumpObjects(out, indent, loader, new ClassLoaderDump(parent));
         }
     }
 }

@@ -1,6 +1,6 @@
 package javaxt.http.servlet;
+import java.util.*;
 import java.io.IOException;
-import java.util.Locale;
 import java.nio.ByteBuffer;
 import javax.servlet.AsyncContext;
 import javax.servlet.DispatcherType;
@@ -23,6 +23,7 @@ import org.eclipse.jetty.server.HttpInput;
 public class HttpServletRequest {
 
     private javax.servlet.http.HttpServletRequest request;
+    private HashMap<String, List<String>> parameters;
     private ServletContext servletContext;
     private String servletPath;
 
@@ -68,6 +69,9 @@ public class HttpServletRequest {
             e.printStackTrace();
         }
 
+
+      //Parse query string
+        parameters = parseQueryString(url.getQuery());
     }
 
 
@@ -153,7 +157,7 @@ public class HttpServletRequest {
    *  @param name A String specifying the header name (e.g. "Accept-Language").
    *  The header name is case insensitive.
    */
-    public java.util.Enumeration<String> getHeaders(String name){
+    public Enumeration<String> getHeaders(String name){
         return request.getHeaders(name);
     }
 
@@ -164,7 +168,7 @@ public class HttpServletRequest {
   /** Returns an enumeration of all the header names this request contains. If
    *  the request has no headers, this method returns an empty enumeration.
    */
-    public java.util.Enumeration<String> getHeaderNames(){
+    public Enumeration<String> getHeaderNames(){
         return request.getHeaderNames();
     }
 
@@ -260,7 +264,7 @@ public class HttpServletRequest {
    *  request doesn't provide an Accept-Language header, this method returns
    *  an Enumeration containing one Locale, the default locale for the server.
    */
-    public java.util.Enumeration<Locale> getLocales(){
+    public Enumeration<Locale> getLocales(){
         return request.getLocales();
     }
 
@@ -574,7 +578,18 @@ public class HttpServletRequest {
    *  an empty string.
    */
     public String getParameter(String key){
-        return request.getParameter(key);
+        StringBuffer str = new StringBuffer();
+        List<String> values = getParameter(key, parameters);
+        if (values!=null){
+            for (int i=0; i<values.size(); i++){
+                str.append(values.get(i));
+                if (i<values.size()-1) str.append(",");
+            }
+            return str.toString();
+        }
+        else{
+            return null;
+        }
     }
 
 
@@ -587,8 +602,8 @@ public class HttpServletRequest {
    *  Note that this method does NOT retrieve or parse posted data from form
    *  data. Use the getForm() method instead.
    */
-    public java.util.Enumeration<String> getParameterNames(){
-        return request.getParameterNames();
+    public Enumeration<String> getParameterNames(){
+        return Collections.enumeration(parameters.keySet());
     }
 
 
@@ -601,21 +616,31 @@ public class HttpServletRequest {
    *  data. Use the getForm() method instead.
    */
     public String[] getParameterValues(String name){
-        return request.getParameterValues(name);
+        List<String> values = getParameter(name, parameters);
+        if (values!=null){
+            return values.toArray(new String[values.size()]);
+        }
+        return null;
     }
 
 
   //**************************************************************************
   //** getParameterMap
   //**************************************************************************
-  /** Returns an immutable java.util.Map containing parameters found in the
+  /** Returns an immutable Map containing parameters found in the
    *  query string. The keys in the parameter map are of type String. The
    *  values in the parameter map are of type String array.<p/>
    *  Note that this method does NOT retrieve or parse posted data from form
    *  data. Use the getForm() method instead.
    */
-    public java.util.Map<String, String[]> getParameterMap(){
-        return request.getParameterMap();
+    public Map<String, String[]> getParameterMap(){
+        HashMap<String, String[]> map = new HashMap<String, String[]>();
+        Iterator<String> it = parameters.keySet().iterator();
+        while (it.hasNext()){
+            String key = it.next();
+            map.put(key, getParameterValues(key));
+        }
+        return map;
     }
 
 
@@ -737,7 +762,7 @@ public class HttpServletRequest {
 
 
                     void end() {
-                        System.out.println("Done!");
+                        //System.out.println("Done!");
 
                         async.complete();
                         try{
@@ -816,7 +841,7 @@ public class HttpServletRequest {
    *  getFormInputs() method. Note how easy it is to identify an uploaded
    *  file and save it to disk.
    <pre>
-        java.util.Iterator&lt;FormInput&gt; it = request.getFormInputs();
+        Iterator&lt;FormInput&gt; it = request.getFormInputs();
         while (it.hasNext()){
             FormInput input = it.next();
             String name = input.getName();
@@ -871,9 +896,9 @@ public class HttpServletRequest {
   //**************************************************************************
   //** FormIterator Class
   //**************************************************************************
-  /** Simple implementation of a java.util.Iterator used to parse form data.
+  /** Simple implementation of a Iterator used to parse form data.
    */
-    private class FormIterator implements java.util.Iterator {
+    private class FormIterator implements Iterator {
 
         private FormInput currInput = null;
         private FormInput prevInput = null;
@@ -1000,6 +1025,7 @@ public class HttpServletRequest {
   /** @deprecated As of Version 2.1 of the Java Servlet API.
    *  Use isRequestedSessionIdFromURL() instead.
    */
+    @Deprecated
     public boolean isRequestedSessionIdFromUrl(){
         return isRequestedSessionIdFromURL();
     }
@@ -1069,7 +1095,7 @@ public class HttpServletRequest {
    *  attributes associated with it. See getAttribute() and setAttribute() for
    *  more information.
    */
-    public java.util.Enumeration<String> getAttributeNames(){
+    public Enumeration<String> getAttributeNames(){
         return request.getAttributeNames();
     }
 
@@ -1093,6 +1119,7 @@ public class HttpServletRequest {
   /** @deprecated As of Version 2.1 of the Java Servlet API. Use
    *  ServletContext.getRealPath() instead.
    */
+    @Deprecated
     public String getRealPath(String path){
         //return request.getRealPath(path);
         return servletContext.getRealPath(path);
@@ -1373,10 +1400,10 @@ public class HttpServletRequest {
         out.append("\r\n");
 
 
-        java.util.Enumeration<String> headerNames = request.getHeaderNames();
+        Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String name = headerNames.nextElement();
-            java.util.Enumeration<String> headerValues = request.getHeaders(name);
+            Enumeration<String> headerValues = request.getHeaders(name);
             while (headerValues.hasMoreElements()) {
                 String value = headerValues.nextElement();
                 out.append(name);
@@ -1390,4 +1417,103 @@ public class HttpServletRequest {
         return out.toString();
     }
 
+
+
+  //**************************************************************************
+  //** parseQueryString
+  //**************************************************************************
+  /** Used to parse a url query string and create a list of name/value pairs.
+   *  This method is called in the constructor to parse the querystring found
+   *  in the request URL.
+   */
+    private HashMap<String, List<String>> parseQueryString(String query){
+
+
+      //IMPLEMENTATION NOTE: Code copied from the javaxt.utils.URL class
+
+      //Create an empty hashmap
+        HashMap<String, List<String>> parameters = new HashMap<String, List<String>>();
+        if (query==null) return parameters;
+
+        query = query.trim();
+        if (query.length()==0) return parameters;
+
+
+      //Parse the querystring, one character at a time
+        if (query.startsWith("&")) query = query.substring(1);
+        query += "&";
+
+
+        StringBuffer word = new StringBuffer();
+        for (int i=0; i<query.length(); i++){
+
+            String c = query.substring(i,i+1);
+            if (c.equals("&")){
+
+                if (i+5<query.length() && query.substring(i,i+5).equals("&amp;")){
+                    word.append(c);
+                }
+                else{
+                    int x = word.indexOf("=");
+                    if (x>=0){
+                        String key = word.substring(0,x);
+                        String value = decode(word.substring(x+1));
+
+                        List<String> values = getParameter(key, parameters);
+                        if (values==null) values = new LinkedList<String>();
+                        values.add(value);
+                        setParameter(key, values, parameters);
+                    }
+                    else{
+                        setParameter(word.toString(), null, parameters);
+                    }
+
+                    word = new StringBuffer();
+                }
+            }
+            else{
+                word.append(c);
+            }
+        }
+        return parameters;
+    }
+
+    private static List<String> getParameter(String key, HashMap<String, List<String>> parameters){
+        List<String> values = parameters.get(key);
+        if (values==null){
+            Iterator<String> it = parameters.keySet().iterator();
+            while (it.hasNext()){
+                String s = it.next();
+                if (s.equalsIgnoreCase(key)) return parameters.get(s);
+            }
+        }
+        return values;
+    }
+
+    private static void setParameter(String key, List<String> values, HashMap<String, List<String>> parameters){
+        Iterator<String> it = parameters.keySet().iterator();
+        while (it.hasNext()){
+            String s = it.next();
+            if (s.equalsIgnoreCase(key)){
+                parameters.put(key, values);
+                return;
+            }
+        }
+        parameters.put(key, values);
+    }
+
+    private static String decode(String str){
+        try{
+            return java.net.URLDecoder.decode(str, "UTF-8");
+        }
+        catch(Exception e){
+          //This should never happen. Try to decode the string manually?
+            String find[] = new String[]{"%2C","%2F","%3A"};
+            String replace[] = new String[]{",","/",":"};
+            for (int i=0; i<find.length; i++){
+                 str = str.replace(find[i],replace[i]);
+            }
+            return str;
+        }
+    }
 }

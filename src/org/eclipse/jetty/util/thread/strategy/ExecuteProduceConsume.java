@@ -1,6 +1,6 @@
 //
 //  ========================================================================
-//  Copyright (c) 1995-2016 Mort Bay Consulting Pty. Ltd.
+//  Copyright (c) 1995-2021 Mort Bay Consulting Pty Ltd and others.
 //  ------------------------------------------------------------------------
 //  All rights reserved. This program and the accompanying materials
 //  are made available under the terms of the Eclipse Public License v1.0
@@ -41,28 +41,23 @@ import org.eclipse.jetty.util.thread.Locker.Lock;
  * does not yet have capacity to consume, which can save memory and exert back
  * pressure on producers.</p>
  */
-public class ExecuteProduceConsume extends ExecutingExecutionStrategy implements ExecutionStrategy, Runnable
+public class ExecuteProduceConsume implements ExecutionStrategy, Runnable
 {
     private static final Logger LOG = Log.getLogger(ExecuteProduceConsume.class);
 
     private final Locker _locker = new Locker();
     private final Runnable _runProduce = new RunProduce();
     private final Producer _producer;
+    private final Executor _executor;
     private boolean _idle = true;
     private boolean _execute;
     private boolean _producing;
     private boolean _pending;
 
-
     public ExecuteProduceConsume(Producer producer, Executor executor)
     {
-        this(producer,executor,InvocationType.BLOCKING);
-    }
-    
-    public ExecuteProduceConsume(Producer producer, Executor executor, InvocationType preferred )
-    {
-        super(executor,preferred);
         this._producer = producer;
+        _executor = executor;
     }
 
     @Override
@@ -111,7 +106,7 @@ public class ExecuteProduceConsume extends ExecutingExecutionStrategy implements
                 _execute = true;
         }
         if (dispatch)
-            execute(_runProduce);
+            _executor.execute(_runProduce);
     }
 
     @Override
@@ -178,7 +173,7 @@ public class ExecuteProduceConsume extends ExecutingExecutionStrategy implements
                 if (!_pending)
                 {
                     // dispatch one
-                    dispatch = _pending = Invocable.getInvocationType(task)!=InvocationType.NON_BLOCKING;
+                    dispatch = _pending = Invocable.getInvocationType(task) != InvocationType.NON_BLOCKING;
                 }
 
                 _execute = false;
@@ -190,15 +185,14 @@ public class ExecuteProduceConsume extends ExecutingExecutionStrategy implements
                 // Spawn a new thread to continue production by running the produce loop.
                 if (LOG.isDebugEnabled())
                     LOG.debug("{} dispatch", this);
-                if (!execute(this))
-                    task = null;
+                _executor.execute(this);
             }
 
             // Run the task.
             if (LOG.isDebugEnabled())
                 LOG.debug("{} run {}", this, task);
             if (task != null)
-                invoke(task);
+                task.run();
             if (LOG.isDebugEnabled())
                 LOG.debug("{} ran {}", this, task);
 
@@ -224,6 +218,7 @@ public class ExecuteProduceConsume extends ExecutingExecutionStrategy implements
         }
     }
 
+    @Override
     public String toString()
     {
         StringBuilder builder = new StringBuilder();
@@ -245,15 +240,6 @@ public class ExecuteProduceConsume extends ExecutingExecutionStrategy implements
         public void run()
         {
             produce();
-        }
-    }
-
-    public static class Factory implements ExecutionStrategy.Factory
-    {
-        @Override
-        public ExecutionStrategy newExecutionStrategy(Producer producer, Executor executor)
-        {
-            return new ExecuteProduceConsume(producer, executor);
         }
     }
 }

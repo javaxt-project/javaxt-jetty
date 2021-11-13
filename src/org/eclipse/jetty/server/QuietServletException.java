@@ -1,6 +1,6 @@
 //
 //  ========================================================================
-//  Copyright (c) 1995-2016 Mort Bay Consulting Pty. Ltd.
+//  Copyright (c) 1995-2021 Mort Bay Consulting Pty Ltd and others.
 //  ------------------------------------------------------------------------
 //  All rights reserved. This program and the accompanying materials
 //  are made available under the terms of the Eclipse Public License v1.0
@@ -20,16 +20,17 @@ package org.eclipse.jetty.server;
 
 import javax.servlet.ServletException;
 
+import org.eclipse.jetty.io.QuietException;
 
-/* ------------------------------------------------------------ */
-/** A ServletException that is logged less verbosely than
+/**
+ * A ServletException that is logged less verbosely than
  * a normal ServletException.
  * <p>
  * Used for container generated exceptions that need only a message rather
  * than a stack trace.
  * </p>
  */
-public class QuietServletException extends ServletException
+public class QuietServletException extends ServletException implements QuietException
 {
     public QuietServletException()
     {
@@ -38,7 +39,7 @@ public class QuietServletException extends ServletException
 
     public QuietServletException(String message, Throwable rootCause)
     {
-        super(message,rootCause);
+        super(message, rootCause);
     }
 
     public QuietServletException(String message)
