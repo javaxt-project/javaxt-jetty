@@ -774,6 +774,7 @@ public class Server extends Thread {
                     }
                 }
 
+                response.setHeader("Cache-Control", "no-cache");
                 response.setStatus(e.getStatusCode());
                 response.setContentType("text/plain");
 

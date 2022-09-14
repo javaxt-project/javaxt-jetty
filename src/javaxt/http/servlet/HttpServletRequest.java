@@ -7,6 +7,7 @@ import javax.servlet.DispatcherType;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 
+import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.HttpInput;
 
 //******************************************************************************
@@ -22,6 +23,7 @@ import org.eclipse.jetty.server.HttpInput;
 
 public class HttpServletRequest {
 
+    private HttpServlet servlet;
     private javax.servlet.http.HttpServletRequest request;
     private HashMap<String, List<String>> parameters;
     private ServletContext servletContext;
@@ -42,6 +44,7 @@ public class HttpServletRequest {
 
     public HttpServletRequest(javax.servlet.http.HttpServletRequest request, HttpServlet servlet){
         this.request = request;
+        this.servlet = servlet;
         this.servletPath = servlet.getServletPath();
         this.servletContext = servlet.getServletContext();
 
@@ -138,13 +141,31 @@ public class HttpServletRequest {
         return request.getHeader(name);
     }
 
-//
-//  //**************************************************************************
-//  //** setHeader
-//  //**************************************************************************
-//    public void setHeader(String name, String value){
-//        request.setHeader(name, value);
-//    }
+
+  //**************************************************************************
+  //** setHeader
+  //**************************************************************************
+    public void setHeader(String name, String value){
+
+        Request req = Request.getBaseRequest(request);
+        req.setHeader(name, value);
+
+
+      //Reset authentication parameters
+        authenticate = true;
+        authenticationException = null;
+        principal = null;
+        getUserPrincipal = true;
+        getCredentials = true;
+        credentials = null;
+        try{
+            authenticator = servlet.getAuthenticator(this);
+        }
+        catch(Exception e){
+            //TODO: Figure out how to propogate this error to the caller!
+            e.printStackTrace();
+        }
+    }
 
 
   //**************************************************************************

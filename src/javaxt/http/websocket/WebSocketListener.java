@@ -166,6 +166,11 @@ public class WebSocketListener  {
     }
 
 
+    public void close(int code, String reason){
+        session.close(code, reason);
+    }
+
+
   //**************************************************************************
   //** disconnect
   //**************************************************************************

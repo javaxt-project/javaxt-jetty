@@ -866,6 +866,16 @@ public class Request implements HttpServletRequest
         return metadata == null ? null : metadata.getFields().get(name);
     }
 
+
+    public void setHeader(String name, String value)
+    {
+        MetaData.Request metadata = _metaData;
+        if (metadata!=null){
+            metadata.getFields().put(name, value);
+        }
+    }
+
+
     /*
      * @see javax.servlet.http.HttpServletRequest#getHeaderNames()
      */
