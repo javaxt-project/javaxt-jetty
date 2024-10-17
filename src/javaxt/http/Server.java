@@ -785,7 +785,7 @@ public class Server extends Thread {
                 StringBuilder error = new StringBuilder((message != null) ? (s + ": " + message) : s);
                 for (StackTraceElement x : e.getStackTrace()){
                     String err = x.toString();
-                    if (err.trim().startsWith("org.eclipse.jetty")) break;
+                    if (err.contains("org.eclipse.jetty")) break;
                     error.append("\n");
                     error.append(err);
                 }

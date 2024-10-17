@@ -14,7 +14,7 @@ public class ServletException extends Exception {
     private int statusCode = 400;
 
     public ServletException() {
-        this(400, HttpServletResponse.getStatusMessage(400));
+        this(400);
     }
 
     public ServletException(String message) {
@@ -22,7 +22,7 @@ public class ServletException extends Exception {
     }
 
     public ServletException(String message, Exception e) {
-        this(400, message);
+        this(400, message, e);
     }
 
     public ServletException(int statusCode) {
@@ -30,10 +30,14 @@ public class ServletException extends Exception {
     }
 
     public ServletException(int statusCode, String message) {
-        super((message==null ? HttpServletResponse.getStatusMessage(statusCode) : message));
+        this(statusCode, message, null);
+    }
+
+    public ServletException(int statusCode, String message, Exception e) {
+        super((message==null ? HttpServletResponse.getStatusMessage(statusCode) : message), e);
         this.statusCode = statusCode;
     }
-    
+
     public int getStatusCode(){
         return statusCode;
     }
