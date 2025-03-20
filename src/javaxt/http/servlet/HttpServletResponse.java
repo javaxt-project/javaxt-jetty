@@ -2,6 +2,7 @@ package javaxt.http.servlet;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.util.zip.GZIPOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -37,11 +38,12 @@ public class HttpServletResponse {
 //    private java.util.ArrayList<Cookie> cookies = new java.util.ArrayList<Cookie>();
 //    private Long startRange, endRange;
 
+
   //**************************************************************************
   //** Constructor
   //**************************************************************************
-  /** Creates a new instance of this class. */
-
+  /** Used to instantiate this class with a javax HttpServletResponse
+   */
     public HttpServletResponse(HttpServletRequest request, javax.servlet.http.HttpServletResponse response) {
 
         this.request = request;
@@ -60,6 +62,15 @@ public class HttpServletResponse {
         }
     }
 
+
+  //**************************************************************************
+  //** Constructor
+  //**************************************************************************
+  /** Used to instantiate this class with a jakarta HttpServletResponse
+   */
+    public HttpServletResponse(HttpServletRequest request, jakarta.servlet.http.HttpServletResponse response) {
+        this(request, ServletConverter.getHttpServletResponse(response));
+    }
 
 
   //**************************************************************************
@@ -329,7 +340,12 @@ public class HttpServletResponse {
 
 
     public void setStatus(int statusCode, String statusMessage){
-        response.setStatus(statusCode, statusMessage);
+        try{
+            response.setStatus(statusCode, statusMessage);
+        }
+        catch(Throwable t){
+            response.setStatus(statusCode);
+        }
     }
 
 
@@ -570,23 +586,35 @@ public class HttpServletResponse {
 
 
               //Incrementally compress the byte array and chunk the output
-                HttpOutput out = (HttpOutput) response.getOutputStream();
-                out.setBufferSize(bufferSize);
-                GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize);
                 java.io.InputStream inputStream = new ByteArrayInputStream(bytes);
                 byte[] b = new byte[bufferSize];
-                int x=0;
-                while ( (x = inputStream.read(b)) != -1) {
-                    gz.write(b,0,x);
+                try{
+
+                    HttpOutput out = (HttpOutput) response.getOutputStream();
+                    out.setBufferSize(bufferSize);
+                    try(GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize)){
+                        int x;
+                        while ( (x = inputStream.read(b)) != -1) {
+                            gz.write(b,0,x);
+                        }
+                    }
+
                 }
-                inputStream.close();
+                catch(ClassCastException e){ //special case for javaxt-express
 
-                gz.finish();
-                gz.close();
+                    try (OutputStream out = response.getOutputStream()){
+                        try(GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize)){
+                            int x;
+                            while ( (x = inputStream.read(b)) != -1) {
+                                gz.write(b,0,x);
+                            }
+                        }
+                    }
 
-                gz = null;
-                b = null;
-
+                }
+                finally{
+                    inputStream.close();
+                }
             }
         }
         else{ //no compression
@@ -597,22 +625,30 @@ public class HttpServletResponse {
 
           //Send the contents of the byte array to the client
             java.io.InputStream inputStream = new ByteArrayInputStream(bytes);
-            HttpOutput out = (HttpOutput) response.getOutputStream();
-            out.setBufferSize(bufferSize);
             byte[] b = new byte[bufferSize];
+            try {
 
-            int x=0;
-            while ( (x = inputStream.read(b)) != -1) {
-                out.write(b,0,x);
+                try(HttpOutput out = (HttpOutput) response.getOutputStream()){
+                    out.setBufferSize(bufferSize);
+                    int x;
+                    while ( (x = inputStream.read(b)) != -1) {
+                        out.write(b,0,x);
+                    }
+                }
+
             }
+            catch(ClassCastException e){ //special case for javaxt-express
+                try (OutputStream out = response.getOutputStream()){
+                    int x;
+                    while ( (x = inputStream.read(b)) != -1) {
+                        out.write(b,0,x);
+                    }
+                }
 
-            inputStream.close();
-            inputStream = null;
-
-            out.close();
-            out = null;
-
-            b = null;
+            }
+            finally{
+                inputStream.close();
+            }
         }
     }
 
@@ -723,10 +759,15 @@ public class HttpServletResponse {
       //If the file is small enough, send the file.
         if (fileSize<=bufferSize){
             setContentLength(fileSize);
-            HttpOutput out = (HttpOutput) response.getOutputStream();
-            out.setBufferSize(bufferSize);
-            out.sendContent(FileChannel.open(file.toPath(), StandardOpenOption.READ));
-            return;
+            try{
+                HttpOutput out = (HttpOutput) response.getOutputStream();
+                out.setBufferSize(bufferSize);
+                out.sendContent(FileChannel.open(file.toPath(), StandardOpenOption.READ));
+                return;
+            }
+            catch(ClassCastException e){ //special case for javaxt-express
+                //flow down
+            }
         }
 
 
@@ -750,24 +791,41 @@ public class HttpServletResponse {
             setHeader("Transfer-Encoding", "chunked");
             setHeader("Content-Encoding", "gzip");
 
-
-            HttpOutput out = (HttpOutput) response.getOutputStream();
-            out.setBufferSize(bufferSize);
-            GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize);
             java.io.InputStream inputStream = new java.io.FileInputStream(file);
             byte[] b = new byte[bufferSize];
-            int x=0;
-            while ( (x = inputStream.read(b)) != -1) {
-                gz.write(b,0,x);
+
+            try{
+                HttpOutput out = (HttpOutput) response.getOutputStream();
+                out.setBufferSize(bufferSize);
+                try(GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize)){
+
+                    int x;
+                    while ( (x = inputStream.read(b)) != -1) {
+                        gz.write(b,0,x);
+                    }
+
+                    gz.finish();
+                }
+
             }
-            inputStream.close();
+            catch(ClassCastException e){ //special case for javaxt-express
 
-            gz.finish();
-            gz.close();
+                try (OutputStream out = response.getOutputStream()){
+                    try(GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize)){
 
-            gz = null;
-            b = null;
+                        int x;
+                        while ( (x = inputStream.read(b)) != -1) {
+                            gz.write(b,0,x);
+                        }
 
+                        gz.finish();
+                    }
+                }
+
+            }
+            finally{
+                inputStream.close();
+            }
         }
         else{
 
@@ -799,32 +857,69 @@ public class HttpServletResponse {
 
     private java.util.concurrent.ConcurrentHashMap<String, ByteBuffer> cache = new java.util.concurrent.ConcurrentHashMap<>();
 
-  /** */
+
+  //**************************************************************************
+  //** write
+  //**************************************************************************
+  /** Used to transfer bytes from a ByteBuffer to the response body.
+   */
     public void write(ByteBuffer content) throws IOException {
-        final HttpOutput out = (HttpOutput) response.getOutputStream();
-        out.setBufferSize(bufferSize);
-        final javax.servlet.AsyncContext async = request.startAsync();
-        out.setWriteListener(new javax.servlet.WriteListener(){
 
-            public void onWritePossible() throws IOException{
+        try{
+            final HttpOutput out = (HttpOutput) response.getOutputStream();
+            out.setBufferSize(bufferSize);
+            final javax.servlet.AsyncContext async = request.startAsync();
+            out.setWriteListener(new javax.servlet.WriteListener(){
 
-                while (out.isReady()){
+                public void onWritePossible() throws IOException{
 
-                    if (!content.hasRemaining()){
-                        async.complete();
-                        return;
+                    while (out.isReady()){
+
+                        if (!content.hasRemaining()){
+                            async.complete();
+                            return;
+                        }
+
+                        out.write(content);
                     }
-
-                    out.write(content);
                 }
-            }
 
-            public void onError(Throwable t) {
-                t.printStackTrace();
-                request.getServletContext().log("Async Error",t);
-                async.complete();
-            }
-        });
+                public void onError(Throwable t) {
+                    t.printStackTrace();
+                    request.getServletContext().log("Async Error",t);
+                    async.complete();
+                }
+            });
+        }
+        catch(ClassCastException e){ //special case for javaxt-express
+
+
+            javax.servlet.ServletOutputStream out = response.getOutputStream();
+            final javax.servlet.AsyncContext async = request.startAsync();
+            out.setWriteListener(new javax.servlet.WriteListener(){
+
+                public void onWritePossible() throws IOException{
+
+                    while (out.isReady()){
+
+                        if (!content.hasRemaining()){
+                            async.complete();
+                            return;
+                        }
+
+                      //Not tested...
+                        java.nio.channels.Channels.newChannel(out).write(content);
+                    }
+                }
+
+                public void onError(Throwable t) {
+                    t.printStackTrace();
+                    request.getServletContext().log("Async Error",t);
+                    async.complete();
+                }
+            });
+
+        }
     }
 
 

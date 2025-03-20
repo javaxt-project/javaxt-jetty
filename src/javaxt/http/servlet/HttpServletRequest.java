@@ -42,6 +42,12 @@ public class HttpServletRequest {
     private String[] credentials = null;
 
 
+  //**************************************************************************
+  //** Constructor
+  //**************************************************************************
+  /** Used to instantiate this class with a "javax" HttpServletRequest and a
+   *  JavaXT HttpServlet.
+   */
     public HttpServletRequest(javax.servlet.http.HttpServletRequest request, HttpServlet servlet){
         this.request = request;
         this.servlet = servlet;
@@ -77,6 +83,60 @@ public class HttpServletRequest {
         parameters = parseQueryString(url.getQuery());
     }
 
+
+  //**************************************************************************
+  //** Constructor
+  //**************************************************************************
+  /** Used to instantiate this class with a "javax" HttpServletRequest and
+   *  HttpServlet.
+   */
+    public HttpServletRequest(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServlet servlet){
+        this(request, createServlet(servlet.getServletContext(), request.getServletPath()));
+    }
+
+
+  //**************************************************************************
+  //** Constructor
+  //**************************************************************************
+  /** Used to instantiate this class with a "jakarta" HttpServletRequest and
+   *  a JavaXT HttpServlet.
+   */
+    public HttpServletRequest(jakarta.servlet.http.HttpServletRequest request, HttpServlet servlet){
+        this(ServletConverter.getHttpServletRequest(request), servlet);
+    }
+
+
+  //**************************************************************************
+  //** Constructor
+  //**************************************************************************
+  /** Used to instantiate this class with a "jakarta" HttpServletRequest and
+   *  HttpServlet.
+   */
+    public HttpServletRequest(jakarta.servlet.http.HttpServletRequest request, jakarta.servlet.http.HttpServlet servlet){
+        this(
+            ServletConverter.getHttpServletRequest(request),
+            createServlet(
+                ServletConverter.getServletContext(servlet.getServletContext()), request.getServletPath()
+            )
+        );
+    }
+
+
+  //**************************************************************************
+  //** createServlet
+  //**************************************************************************
+  /** Returns a simple JavaXT HTTPServlet with enough information to
+   *  instantiate this class.
+   */
+    private static HttpServlet createServlet(javax.servlet.ServletContext servletContext, String servletPath) {
+        HttpServlet servlet = new HttpServlet(){
+            public void processRequest(HttpServletRequest request, HttpServletResponse response)
+                throws ServletException, java.io.IOException{}
+        };;
+        servlet.setServletContext(new ServletContext(servletContext));
+        servlet.setServletPath(servletPath);
+        return servlet;
+    }
 
 
   //**************************************************************************
