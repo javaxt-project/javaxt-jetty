@@ -679,9 +679,11 @@ public class HttpServletRequest {
   //**************************************************************************
   /** Returns an Enumeration of String objects containing the names of the
    *  parameters contained in the query string. If the request has no
-   *  parameters, the method returns an empty Enumeration. <p/>
+   *  parameters, the method returns an empty Enumeration.
+   *  <p>
    *  Note that this method does NOT retrieve or parse posted data from form
    *  data. Use the getForm() method instead.
+   *  </p>
    */
     public Enumeration<String> getParameterNames(){
         return Collections.enumeration(parameters.keySet());
@@ -692,9 +694,11 @@ public class HttpServletRequest {
   //** getParameterValues
   //**************************************************************************
   /** Returns an array containing all of the values for a given query string
-   *  parameter or null if the parameter does not exist.<p/>
+   *  parameter or null if the parameter does not exist.
+   *  <p>
    *  Note that this method does NOT retrieve or parse posted data from form
    *  data. Use the getForm() method instead.
+   *  </p>
    */
     public String[] getParameterValues(String name){
         List<String> values = getParameter(name, parameters);
@@ -710,9 +714,11 @@ public class HttpServletRequest {
   //**************************************************************************
   /** Returns an immutable Map containing parameters found in the
    *  query string. The keys in the parameter map are of type String. The
-   *  values in the parameter map are of type String array.<p/>
+   *  values in the parameter map are of type String array.
+   *  <p>
    *  Note that this method does NOT retrieve or parse posted data from form
    *  data. Use the getForm() method instead.
+   *  </p>
    */
     public Map<String, String[]> getParameterMap(){
         HashMap<String, String[]> map = new HashMap<String, String[]>();
@@ -878,13 +884,13 @@ public class HttpServletRequest {
   /** Returns the body of the http request as an input stream. Automatically
    *  decrypts the body if the data is SSL/TLS encrypted. Example:
    <pre>
-        java.io.InputStream inputStream = request.getInputStream();
+    try(java.io.InputStream inputStream = request.getInputStream()){
         byte[] b = new byte[1024];
         int x=0;
         while ( (x = inputStream.read(b)) != -1) {
             //Do something! Example: outputStream.write(b,0,x);
         }
-        inputStream.close();
+    }
    </pre>
    */
     public ServletInputStream getInputStream() throws java.io.IOException {
@@ -916,11 +922,11 @@ public class HttpServletRequest {
    *  "multipart/form-data" with large amounts of binary data (e.g. uploaded
    *  files). Please see the FormInput.getInputStream() or FormInput.toFile()
    *  methods for more information on handling large binary streams.
-   *  <p/>
-   *
+   *  <p>
    *  Here's a simple example of how to iterate through form data using the
    *  getFormInputs() method. Note how easy it is to identify an uploaded
    *  file and save it to disk.
+   *  </p>
    <pre>
         Iterator&lt;FormInput&gt; it = request.getFormInputs();
         while (it.hasNext()){
@@ -939,10 +945,10 @@ public class HttpServletRequest {
    </pre>
    *  Note that the form iterator reads data directly from the socket
    *  connection. Therefore, you should only call this method once.
-   *  <p/>
-   *
+   *  <p>
    *  More information on HTML form data can be found here:<br/>
    *  http://www.w3.org/TR/html401/interact/forms.html#h-17.13.4
+   *  </p>
    */
     public FormIterator getFormInputs() throws IOException {
 
@@ -1132,12 +1138,14 @@ public class HttpServletRequest {
   //** setAttribute
   //**************************************************************************
   /** Returns the value of a given attribute. Returns null if no attribute of
-   *  the given name exists. <p/>
+   *  the given name exists.
+   *  <p>
    *  Attributes contain custom information about a request. Attributes are
    *  set programatically using the setAttribute() method and are typically
    *  used in conjunction with a RequestDispatcher. Attribute names should
    *  follow the same conventions as package names. The servlet specification
    *  reserves names matching "java.*", "javax.*", and "sun.*".
+   *  </p>
    */
     public Object getAttribute(String name){
         return request.getAttribute(name);
@@ -1261,11 +1269,13 @@ public class HttpServletRequest {
    *  Java EE web applications. For example, if a web application is called
    *  "WebApplication", the context path might be "/WebApplication". In this
    *  case, a requested URL will include the context path like this:
-   *  <pre>http://localhost:8080/WebApplication/MyServlet/?abc=123</pre><p/>
+   *  <pre>http://localhost:8080/WebApplication/MyServlet/?abc=123</pre>
    *
+   *  <p>
    *  The context path always comes first in a request URL. The path starts
    *  with a "/" character but does not end with a "/" character. For servlets
-   *  in the default (root) context, this method returns "". <p/>
+   *  in the default (root) context, this method returns "".
+   *  </p>
    *
    *  Note that this server does not currently support the container concept
    *  where multiple servlets are managed by a servlet container. Instead, we
@@ -1287,16 +1297,17 @@ public class HttpServletRequest {
    *  This path starts with a "/" character and includes either the servlet
    *  name or a path to the servlet, but does not include any extra path
    *  information or a query string. For example, consider the following URL:
-   *  <pre>http://localhost:8080/WebApplication/MyServlet/?abc=123</pre><p/>
+   *  <pre>http://localhost:8080/WebApplication/MyServlet/?abc=123</pre>
    *  In this example, the context path is "/WebApplication" and "/MyServlet"
-   *  is the servlet path. <p/>
+   *  is the servlet path.
    *
+   *  <p>
    *  Note that this server does not require a URL "Pattern" to be defined for
    *  for individual servlets. Instead, we have a single servlet that processes
    *  all web requests and can dispatch the requests to other servlets.
    *  Therefore, to retrieve a "servlet path" developers must explicitely set
    *  the servlet path in the servlet and implement logic to process the
-   *  URLs accordingly.
+   *  URLs accordingly.</p>
    */
     public String getServletPath(){
         //return request.getServletPath();
@@ -1333,10 +1344,11 @@ public class HttpServletRequest {
   //**************************************************************************
   /** Returns an array representing the client credentials associated with
    *  this request. The first element in the array represents the username and
-   *  the second element represents the password. <p/>
+   *  the second element represents the password.
+   *  <p>
    *  Credentials are retrieved from an Authenticator. If no Authenticator is
    *  defined or if the Authenticator fails to parse the credentials, this
-   *  method returns a null.
+   *  method returns a null.</p>
    */
     public String[] getCredentials(){
         if (getCredentials){

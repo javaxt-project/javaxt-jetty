@@ -6,10 +6,11 @@ package javaxt.http.servlet;
 /**
  *   Provides a mechanism to store application data across servlets. The
  *   ServletContext is initialized when the web server is initialized. There
- *   is only one context per Java Virtual Machine. <p/>
- *
+ *   is only one context per Java Virtual Machine.
+ *   <p>
  *   This class is a partial implementation of the javax.servlet.ServletContext
  *   interface defined in Version 2.5 of the Java Servlet API.
+ *   </p>
  *
  ******************************************************************************/
 
@@ -280,13 +281,14 @@ public class ServletContext {
   /** Returns a RequestDispatcher that acts as a wrapper for a resource
    *  located at the given path. A RequestDispatcher can be used to forward a
    *  request to the resource or to include the resource in a response. The
-   *  resource can be dynamic or static. <p/>
-   *
+   *  resource can be dynamic or static.
+   *  <p>
    *  The pathname must begin with a "/" and is interpreted as relative
    *  to the current context root.  Use <code>getContext</code> to obtain
    *  a <code>RequestDispatcher</code> for resources in foreign contexts.
    *  This method returns <code>null</code> if the <code>ServletContext</code>
    *  cannot return a <code>RequestDispatcher</code>.
+   *  </p>
    */
     public Object getRequestDispatcher(String path){
         return servletContext.getRequestDispatcher(path);

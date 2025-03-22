@@ -310,10 +310,11 @@ public class HttpServletResponse {
   /** Sets the preferred buffer size for the body of the response. A larger
    *  buffer allows more content to be sent to the client at a time. A smaller
    *  buffer decreases server memory load and allows the client to start
-   *  receiving data more quickly.<p/>
-   *
+   *  receiving data more quickly.
+   *  <p>
    *  This method must be called before any response body content is
    *  written.
+   *  </p>
    */
     public void setBufferSize(int size){
         response.setBufferSize(size);
