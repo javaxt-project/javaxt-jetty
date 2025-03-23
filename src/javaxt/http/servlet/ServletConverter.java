@@ -1839,11 +1839,12 @@ public class ServletConverter {
 
             @Override
             public Enumeration<javax.servlet.Servlet> getServlets() {
-                Iterator<jakarta.servlet.Servlet> servlets = context.getServlets().asIterator();
                 ArrayList<javax.servlet.Servlet> arr = new ArrayList<>();
-                while (servlets.hasNext()){
-                    arr.add(ServletConverter.getServlet(servlets.next()));
-                }
+                for (
+                    Enumeration<jakarta.servlet.Servlet> e = context.getServlets();
+                    e.hasMoreElements();
+                ) arr.add(ServletConverter.getServlet(e.nextElement()));
+
                 return Collections.enumeration(arr);
             }
 
@@ -2092,11 +2093,11 @@ public class ServletConverter {
 
             @Override
             public Enumeration<jakarta.servlet.Servlet> getServlets() {
-                Iterator<javax.servlet.Servlet> servlets = context.getServlets().asIterator();
                 ArrayList<jakarta.servlet.Servlet> arr = new ArrayList<>();
-                while (servlets.hasNext()){
-                    arr.add(ServletConverter.getServlet(servlets.next()));
-                }
+                for (
+                    Enumeration<javax.servlet.Servlet> e = context.getServlets();
+                    e.hasMoreElements();
+                ) arr.add(ServletConverter.getServlet(e.nextElement()));
                 return Collections.enumeration(arr);
             }
 
