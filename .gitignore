@@ -1,0 +1,15 @@
+# Ignore build artifacts
+/dist/
+/build/
+/target/
+
+
+# Ignore IDE stuff
+/.vscode/
+/nbproject/
+build.xml
+manifest.mf
+
+
+# Misc
+**/!README.TXT
