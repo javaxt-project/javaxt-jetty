@@ -602,16 +602,7 @@ public class HttpServletResponse {
 
                 }
                 catch(ClassCastException e){ //special case for javaxt-express
-
-                    try (OutputStream out = response.getOutputStream()){
-                        try(GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize)){
-                            int x;
-                            while ( (x = inputStream.read(b)) != -1) {
-                                gz.write(b,0,x);
-                            }
-                        }
-                    }
-
+                    gzipFallback(inputStream, b);
                 }
                 finally{
                     inputStream.close();
@@ -810,19 +801,7 @@ public class HttpServletResponse {
 
             }
             catch(ClassCastException e){ //special case for javaxt-express
-
-                try (OutputStream out = response.getOutputStream()){
-                    try(GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize)){
-
-                        int x;
-                        while ( (x = inputStream.read(b)) != -1) {
-                            gz.write(b,0,x);
-                        }
-
-                        gz.finish();
-                    }
-                }
-
+                gzipFallback(inputStream, b);
             }
             finally{
                 inputStream.close();
@@ -855,6 +834,39 @@ public class HttpServletResponse {
             write(mapped.asReadOnlyBuffer());
         }
     }
+
+
+  //**************************************************************************
+  //** gzipFallback
+  //**************************************************************************
+  /** Fallback for non-Jetty servers. Compress and send file using the
+   *  abstracted servlet output stream provided by the underlying server.
+   *  This is method is intended to support javaxt-express when deployed in
+   *  another server (e.g. Tomcat).
+   */
+    private void gzipFallback(java.io.InputStream inputStream, byte[] b)
+        throws IOException {
+
+
+      //Update "Transfer-Encoding". Some servers send invalid responses when
+      //"Transfer-Encoding" is set to "chunked" (e.g. spring boot / tomcat)
+        setHeader("Transfer-Encoding", "gzip");
+
+
+      //Compress and write data to the servlet output stream
+        try (OutputStream out = response.getOutputStream()){
+            try(GZIPOutputStream gz = new GZIPOutputStream(out, bufferSize)){
+
+                int x;
+                while ( (x = inputStream.read(b)) != -1) {
+                    gz.write(b,0,x);
+                }
+
+                gz.finish();
+            }
+        }
+    }
+
 
     private java.util.concurrent.ConcurrentHashMap<String, ByteBuffer> cache = new java.util.concurrent.ConcurrentHashMap<>();
 
