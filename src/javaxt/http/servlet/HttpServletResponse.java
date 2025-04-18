@@ -755,11 +755,19 @@ public class HttpServletResponse {
                 HttpOutput out = (HttpOutput) response.getOutputStream();
                 out.setBufferSize(bufferSize);
                 out.sendContent(FileChannel.open(file.toPath(), StandardOpenOption.READ));
-                return;
             }
             catch(ClassCastException e){ //special case for javaxt-express
-                //flow down
+                try (OutputStream out = response.getOutputStream()){
+                    try(java.io.InputStream inputStream = new java.io.FileInputStream(file)){
+                        byte[] b = new byte[bufferSize];
+                        int x;
+                        while ( (x = inputStream.read(b)) != -1) {
+                            out.write(b,0,x);
+                        }
+                    }
+                }
             }
+            return;
         }
 
 
