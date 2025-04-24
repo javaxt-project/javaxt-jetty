@@ -1126,6 +1126,7 @@ public class HttpServletRequest {
    */
     public Cookie[] getCookies(){
         javax.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies==null) return null;
         Cookie[] arr = new Cookie[cookies.length];
         for (int i=0; i<arr.length; i++){
             arr[i] = new Cookie(cookies[i]);
@@ -1525,7 +1526,7 @@ public class HttpServletRequest {
       //IMPLEMENTATION NOTE: Code copied from the javaxt.utils.URL class
 
       //Create an empty hashmap
-        HashMap<String, List<String>> parameters = new HashMap<String, List<String>>();
+        LinkedHashMap<String, List<String>> parameters = new LinkedHashMap<>();
         if (query==null) return parameters;
 
         query = query.trim();
@@ -1553,7 +1554,7 @@ public class HttpServletRequest {
                         String value = decode(word.substring(x+1));
 
                         List<String> values = getParameter(key, parameters);
-                        if (values==null) values = new LinkedList<String>();
+                        if (values==null) values = new LinkedList<>();
                         values.add(value);
                         setParameter(key, values, parameters);
                     }
@@ -1568,6 +1569,7 @@ public class HttpServletRequest {
                 word.append(c);
             }
         }
+
         return parameters;
     }
 
@@ -1597,15 +1599,36 @@ public class HttpServletRequest {
 
     private static String decode(String str){
         try{
-            return java.net.URLDecoder.decode(str, "UTF-8");
+
+          //Replace unencoded "%" characters with "%25". The regex finds a "%"
+          //but only those that are NOT followed by 2 hex characters (0-F),
+          //then replaces with the ENCODED version of the % character "%25".
+          //Credit: https://stackoverflow.com/a/18368345
+            str = str.replaceAll("%(?![0-9a-fA-F]{2})", "%25");
+
+
+          //Decode the string with the URLDecoder
+            if (str.contains("+")){
+                StringBuilder out = new StringBuilder();
+                while (str.contains("+")){
+                    int idx = str.indexOf("+");
+                    if (idx==0){
+                        out.append("+");
+                        str = str.substring(1);
+                    }
+                    else{
+                        out.append(java.net.URLDecoder.decode(str.substring(0, idx), "UTF-8"));
+                        str = str.substring(idx);
+                    }
+                }
+                out.append(java.net.URLDecoder.decode(str, "UTF-8"));
+                return out.toString();
+            }
+            else{
+                return java.net.URLDecoder.decode(str, "UTF-8");
+            }
         }
         catch(Exception e){
-          //This should never happen. Try to decode the string manually?
-            String find[] = new String[]{"%2C","%2F","%3A"};
-            String replace[] = new String[]{",","/",":"};
-            for (int i=0; i<find.length; i++){
-                 str = str.replace(find[i],replace[i]);
-            }
             return str;
         }
     }
