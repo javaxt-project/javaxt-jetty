@@ -74,6 +74,16 @@ public class HttpServletResponse {
 
 
   //**************************************************************************
+  //** getRequest
+  //**************************************************************************
+  /** Returns the HttpServletRequest request used to initiate this response.
+   */
+    public HttpServletRequest getRequest(){
+        return request;
+    }
+
+
+  //**************************************************************************
   //** addCookie
   //**************************************************************************
   /** Adds the specified cookie to the response.
@@ -482,15 +492,17 @@ public class HttpServletResponse {
   //**************************************************************************
   //** write
   //**************************************************************************
-  /** Used to write a block of text in the response body. You should only call
-   *  this method once.
+  /** Used to write text (plain text, html, json, etc) to the response body.
+   *  You should only call this method once.
    *  @param compressOutput Specify whether to gzip compress the text.
    *  Note that this option will be applied only if "Accept-Encoding" supports
    *  gzip compression.
    */
     public void write(String text, boolean compressOutput) throws IOException {
         try{
-            write(text.getBytes(charSet), compressOutput);
+            byte[] bytes = text.getBytes(charSet);
+            setCharacterEncoding(charSet);
+            write(bytes, compressOutput);
         }
         catch(java.io.UnsupportedEncodingException e){
             //this error should have been thrown earlier (setCharacterEncoding)
@@ -501,12 +513,27 @@ public class HttpServletResponse {
   //**************************************************************************
   //** write
   //**************************************************************************
-  /** Used to write a block of text in the response body. Will automatically
-   *  try to gzip compress the text if "Accept-Encoding" supports gzip
-   *  compression. You should only call this method once.
+  /** Used to write text (plain text, html, json, etc) to the response body.
+   *  Will automatically try to gzip compress the text if "Accept-Encoding"
+   *  supports gzip compression. You should only call this method once.
    */
     public void write(String text) throws IOException {
-        this.write(text, true);
+        write(text, true);
+    }
+
+
+  //**************************************************************************
+  //** write
+  //**************************************************************************
+  /** Used to write text (plain text, html, json, etc) to the response body.
+   *  Transparently handles caching using "ETag" and "Last-Modified" headers.
+   *  Will automatically try to gzip compress the text if "Accept-Encoding"
+   *  supports gzip compression. You should only call this method once.
+   *  @param date UTC date in milliseconds since January 1, 1970, 00:00:00 UTC
+   */
+    public void write(String text, long date) throws IOException {
+        if (send304(date, text.length())) return;
+        write(text, true);
     }
 
 
@@ -660,6 +687,21 @@ public class HttpServletResponse {
   //**************************************************************************
   //** write
   //**************************************************************************
+  /** Used to write bytes to the response body. Transparently handles caching
+   *  using "ETag" and "Last-Modified" headers. Will automatically try to gzip
+   *  compress the text if "Accept-Encoding" supports gzip compression. You
+   *  should only call this method once.
+   *  @param date UTC date in milliseconds since January 1, 1970, 00:00:00 UTC
+   */
+    public void write(byte[] bytes, long date) throws IOException {
+        if (send304(date, bytes.length)) return;
+        write(bytes, true);
+    }
+
+
+  //**************************************************************************
+  //** write
+  //**************************************************************************
   /** Used to write contents of a file into the response body. Automatically
    *  compresses the file content if the client supports gzip compression.
    *  You should only call this method once.
@@ -682,14 +724,19 @@ public class HttpServletResponse {
   /** Used to write contents of a file into the response body. Automatically
    *  compresses the file content if the client supports gzip compression.
    *  You should only call this method once.
-   *  @param fileName Optional file name used in the "Content-Disposition" header.
-   *  If the fileName is null, the "Content-Disposition" header will not be
-   *  set by this method.
+   *  @param file The file to send to the client
+   *  @param fileName Optional file name used in the "Content-Disposition"
+   *  header. If the fileName is null, the "Content-Disposition" header will
+   *  not be set by this method.
+   *  @param useCache If true, will generate "ETag", "Last-Modified", and
+   *  "Cache-Control" headers. If the "ETag" matches the "if-none-match"
+   *  or if the "Last-Modified" matches the "if-modified-since" request
+   *  headers then a 304 "Not Modified" is returned.
    */
     public void write(java.io.File file, String fileName, String contentType, boolean useCache)
         throws IOException {
 
-        if (!file.exists() || file.isDirectory()){
+        if (file==null || !file.exists() || file.isDirectory()){
             this.setStatus(404);
             return;
         }
@@ -700,44 +747,10 @@ public class HttpServletResponse {
 
       //Process Cache Directives
         if (useCache){
-
-            String eTag = "W/\"" + fileSize + "-" + fileDate + "\"";
-            setHeader("ETag", eTag);
-            setHeader("Last-Modified", getDate(fileDate)); //Sat, 23 Oct 2010 13:04:28 GMT
-            //this.setHeader("Cache-Control", "max-age=315360000");
-            //this.setHeader("Expires", "Sun, 30 Sep 2018 16:23:15 GMT  ");
-
-
-          //Return 304/Not Modified response if we can...
-            String matchTag = request.getHeader("if-none-match");
-            String cacheControl = request.getHeader("cache-control");
-            if (matchTag==null) matchTag = "";
-            if (cacheControl==null) cacheControl = "";
-            if (cacheControl.equalsIgnoreCase("no-cache")==false){
-                if (eTag.equalsIgnoreCase(matchTag)){
-                    //System.out.println("Sending 304 Response!");
-                    this.setStatus(304);
-                    return;
-                }
-                else{
-                  //Internet Explorer 6 uses "if-modified-since" instead of "if-none-match"
-                    matchTag = request.getHeader("if-modified-since");
-                    if (matchTag!=null){
-                        for (String tag: matchTag.split(";")){
-                            if (tag.trim().equalsIgnoreCase(getDate(fileDate))){
-                                //System.out.println("Sending 304 Response!");
-                                this.setStatus(304);
-                                return;
-                            }
-                        }
-                    }
-
-                }
-            }
-
+            if (send304(fileDate, fileSize)) return;
         }
         else{
-            setHeader ("Cache-Control", "no-cache");
+            setHeader("Cache-Control", "no-store");
         }
 
 
@@ -1220,6 +1233,61 @@ public class HttpServletResponse {
         java.util.Calendar cal = java.util.Calendar.getInstance();
         cal.setTimeInMillis(milliseconds);
         return getDate(cal);
+    }
+
+
+  //**************************************************************************
+  //** send304
+  //**************************************************************************
+  /** Sets the "ETag", "Last-Modified", and "Cache-Control" response headers.
+   *  If the "ETag" matches the "if-none-match" or if the "Last-Modified"
+   *  matches the "if-modified-since" request headers then the status is set
+   *  to 304 "Not Modified".
+   *  @return Returns true if the status was set to 304. Otherwise, returns
+   *  false.
+   */
+    private boolean send304(long date, long size){
+
+      //Generate "ETag", "Last-Modified" headers
+        String eTag = "W/\"" + size + "-" + date + "\"";
+        response.setHeader("ETag", eTag);
+        response.setHeader("Last-Modified", getDate(date)); //Sat, 23 Oct 2010 13:04:28 GMT
+
+
+      //Set "Cache-Control" to "no-cache". The no-cache response directive
+      //indicates that the response can be stored in caches, but the response
+      //must be validated with the server before each reuse.
+        response.setHeader("Cache-Control", "no-cache");
+
+
+      //Return 304/Not Modified response if we can...
+        String matchTag = request.getHeader("if-none-match");
+        String cacheControl = request.getHeader("cache-control");
+        if (matchTag==null) matchTag = "";
+        if (cacheControl==null) cacheControl = "";
+        if (cacheControl.equalsIgnoreCase("no-cache")==false){
+            if (eTag.equalsIgnoreCase(matchTag)){
+                //System.out.println("Sending 304 Response!");
+                response.setStatus(304);
+                return true;
+            }
+            else{
+              //Internet Explorer 6 uses "if-modified-since" instead of "if-none-match"
+                matchTag = request.getHeader("if-modified-since");
+                if (matchTag!=null){
+                    for (String tag: matchTag.split(";")){
+                        if (tag.trim().equalsIgnoreCase(response.getHeader("Last-Modified"))){
+                            //System.out.println("Sending 304 Response!");
+                            response.setStatus(304);
+                            return true;
+                        }
+                    }
+                }
+
+            }
+        }
+
+        return false;
     }
 
 
