@@ -161,7 +161,7 @@ public abstract class HttpServlet {
   //**************************************************************************
   /** Returns a new instance of an Authenticator used to authenticate users.
    */
-    protected Authenticator getAuthenticator(HttpServletRequest request){
+    public Authenticator getAuthenticator(HttpServletRequest request){
         if (authenticator!=null) return authenticator.newInstance(request);
         else return null;
     }
